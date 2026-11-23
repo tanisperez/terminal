@@ -51,15 +51,27 @@ Expo/React Native conventions here.
 - Settings apply at once and are saved, as every app on telaio (shared rules, section 10), not
   with the Cancel and Save buttons of board F.
 - The default theme is Dark, the pure black of the design.
+- Pasted clipboard images (#3, decided on 2026-11-23) are saved as PNG in the OS cache folder
+  (`~/.cache/tterm/images/`, `~/Library/Caches/tterm/images/`,
+  `%LOCALAPPDATA%\tterm\cache\images\`), never in Downloads or `/tmp`, so a resumed agent
+  session still finds them. Images older than `pasted_images_days` (14 by default) are deleted at
+  startup.
+- Agent usage (#6, decided on 2026-11-23) comes from Claude Code only, for now: the `usage` of
+  each assistant message in `~/.claude/projects/*/*.jsonl`, read in the background when the
+  screen opens. Only the usage lines are read, never the content. Input tokens include the cache
+  (creation and reads), with the breakdown in the tooltip. Open sessions are the tabs running
+  `claude`.
+- Profiles (#5, decided on 2026-11-23) live in `settings.toml`: detected profiles are not
+  written; the user's own ones are `[[profiles]]` tables (`name`, `shell`, `cwd`, `startup`,
+  `color`, `shortcut`), plus `default_profile` and `hidden_profiles`. `startup` is typed into the
+  shell instead of replacing it, so the tab stays open when the program exits.
 
 ## Pending decisions (ask before choosing)
 
 - Fonts: board T bundles JetBrains Mono, Cascadia Code (the default), Fira Code and Geist Mono.
   Only Geist Mono (from telaio) is bundled today; the others are offered when installed.
-- Where pasted clipboard images are saved, and for how long (board E).
-- Where the agent usage data comes from (board H2): which agents, which files.
-- Profiles (P1, W1, M1, W2): the detection of shells (WSL distributions, PowerShell, cmd, the
-  login shell) and the format of the profiles in `settings.toml`.
+- Agents other than Claude Code in the usage screen.
+- Environment variables per profile.
 - Splits: not in the design; ask before designing them.
 
 ## Architecture
