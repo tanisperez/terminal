@@ -6,9 +6,9 @@
 //! The feature exists only in builds made with `TTERM_UPDATER=github` (the release CI sets it
 //! for macOS, Windows and Linux) on a platform `telaio-update` knows. On Linux, a copy the
 //! install script installed in a prefix the user can write (`~/.local` by default) downloads and
-//! installs updates like macOS and Windows; the other manual installs (the tarball, the AppImage,
-//! a script install under `/usr/local`) only announce new versions, and a package managed copy
-//! (deb, rpm, Arch) shows nothing. Everything compiles everywhere; [`updater_enabled`] is the one
+//! installs updates like macOS and Windows; the other manual installs (the tarball unpacked by
+//! hand, a script install under `/usr/local`) only announce new versions, and a copy a package
+//! manager installed shows nothing (tterm ships no Linux packages, but a distribution may). Everything compiles everywhere; [`updater_enabled`] is the one
 //! switch the setting rows, the bar and the startup check consult.
 
 use std::path::Path;
@@ -56,7 +56,7 @@ pub fn updater_enabled() -> bool {
 pub enum ManualUpdate {
     /// A portable Windows copy: the new zip from the release page.
     PortableZip,
-    /// A Linux tarball or AppImage: the new one from the release page.
+    /// A Linux tarball unpacked by hand: the new one from the release page.
     Download,
     /// Installed by the install script in a prefix that needs root (`/usr/local`): run
     /// [`INSTALL_COMMAND`] again. A script install the user can write updates itself.

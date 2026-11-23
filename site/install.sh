@@ -104,8 +104,8 @@ uninstall() {
     fi
 }
 
-# tterm installed by a package manager (deb, rpm, AUR) lives in /usr/bin. A second copy under
-# another prefix would never be updated by it, and which one runs would depend on PATH.
+# A tterm in /usr/bin that this script did not install (a package or a build installed by hand)
+# would not be updated by it, and which copy runs would depend on PATH.
 check_no_package() {
     local manifest=$1
     local packaged=${TTERM_PACKAGED_BINARY:-/usr/bin/$name}
@@ -113,9 +113,8 @@ check_no_package() {
     if [[ -f $manifest ]] && grep -Fxq "$packaged" "$manifest"; then
         return 0
     fi
-    die "tterm is already installed in $packaged, most likely by your package manager.
-It keeps that copy up to date. To use this script instead, remove it first
-(sudo apt remove tterm, sudo dnf remove tterm or sudo pacman -R tterm)."
+    die "tterm is already installed in $packaged, not by this script.
+To use this script instead, remove that copy first."
 }
 
 # Says what is about to happen: an install, a reinstall or an update from the version in the

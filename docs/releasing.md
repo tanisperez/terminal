@@ -3,10 +3,9 @@
 Publishing a version means pushing a tag. The `Release` workflow
 (`.github/workflows/release.yml`) builds tterm for every platform, attaches the packages to the
 GitHub release of that tag and publishes it, with `latest.json`, the manifest of the in-app
-updater. It is ted's workflow, plus Zig 0.17 on Linux and Windows to build libghostty-vt. Once
-the release is published, `website.yml` rebuilds the site: when the `GPG_PRIVATE_KEY` and
-`GPG_PASSPHRASE` secrets exist, the APT and DNF repositories get the new packages
-(`packaging/linux/README.md`). To try an update between pre-releases, start a build made with
+updater. It is ted's workflow, plus Zig 0.17 on Linux and Windows to build libghostty-vt, with
+fewer Linux packages: the tarball and the install script only (decided on 2026-11-23). Once the
+release is published, `website.yml` rebuilds the site. To try an update between pre-releases, start a build made with
 `TTERM_UPDATER=github` with `TTERM_UPDATE_URL` set to the address of another `latest.json`.
 
 ## Versions and tags
@@ -64,22 +63,17 @@ scripts live in `packaging/`, and every one can run locally.
 
 | Asset | Content |
 | --- | --- |
-| `tterm-X.Y.Z-linux-x86_64.tar.gz` | `bin/tterm`, the desktop entry, the icons and `install.sh` in a `/usr`-like layout |
-| `tterm_X.Y.Z_amd64.deb`, `tterm-X.Y.Z-1.x86_64.rpm` | built with `nfpm` from `packaging/linux/nfpm.yaml` |
-| `tterm-X.Y.Z-1-x86_64.pkg.tar.zst` | Arch package, written by `package.sh` with `bsdtar` and `zstd` |
-| `tterm-X.Y.Z-x86_64.AppImage` | the same files in an AppImage; system libraries are not bundled |
+| `tterm-X.Y.Z-linux-x86_64.tar.gz` | `bin/tterm`, the desktop entry, the icons and `install.sh` in a `/usr`-like layout; `curl -fsSL https://terminal.tanis.codes/install.sh \| bash` installs it in `~/.local` and the in-app updater keeps it up to date |
 | `tterm-X.Y.Z-macos-arm64.dmg`, `.app.tar.gz` | `tterm.app`, ad-hoc signed; the tarball is for the updater |
-| `tterm-X.Y.Z-windows-x86_64-setup.exe` | Inno Setup, **per-user** install, no administrator rights |
+| `tterm-X.Y.Z-windows-x86_64-setup.exe` | Inno Setup, **per-user** install, no administrator rights, with `tterm` on the `PATH` |
 | `tterm-X.Y.Z-windows-x86_64-portable.zip` | `tterm.exe`, `LICENSE` and `NOTICE`, nothing to install |
 | `latest.json`, `SHA256SUMS` | the updater manifest and the checksums of every asset |
 
-Locally, on Linux, with Zig 0.17, `nfpm`, `appimagetool` (and its type2 runtime), `bsdtar` and
-`zstd` on the `PATH`:
+Locally, on Linux, with Zig 0.17 on the `PATH`:
 
 ```
 make release
 packaging/linux/package.sh 0.1.0 target/release/tterm dist
-APPIMAGE_EXTRACT_AND_RUN=1 packaging/linux/appimage.sh 0.1.0 target/release/tterm dist
 ```
 
 `packaging/macos/bundle.sh` needs a Mac (`iconutil`, `codesign`, `hdiutil`), and
@@ -96,10 +90,10 @@ APPIMAGE_EXTRACT_AND_RUN=1 packaging/linux/appimage.sh 0.1.0 target/release/tter
 - macOS, Windows and a Linux copy installed by `install.sh` in a folder the user can write
   download the update in the background and verify its SHA-256; the bar then shows
   "X.Y.Z ready · Restart" (design R). The restart always asks first, since it closes every tab;
-- a portable Windows copy, a Linux tarball or AppImage only announce the new version
+- a portable Windows copy or a Linux tarball unpacked by hand only announce the new version
   ("X.Y.Z available" opens the release page); a script install under `/usr/local` copies the
-  install command instead; a deb, rpm or Arch copy updates with its package manager and shows
-  nothing.
+  install command instead; a copy a package manager installed (tterm ships none, but a
+  distribution may) shows nothing.
 
 ## Desktop integration
 
@@ -108,7 +102,7 @@ APPIMAGE_EXTRACT_AND_RUN=1 packaging/linux/appimage.sh 0.1.0 target/release/tter
   committed (`packaging/icons/README.md`). The macOS `.icns` is built at bundle time.
 - **Linux:** `codes.tanis.tterm.desktop` (the Wayland `app_id` and X11 `WM_CLASS` of the
   window), in the System and TerminalEmulator categories, with `Exec=tterm %F`: a folder dropped
-  on the launcher opens there. The deb, rpm and Arch packages put `tterm` in `/usr/bin`.
+  on the launcher opens there. The install script puts `tterm` in `~/.local/bin`.
 - **Windows:** the installer adds a Start menu entry (with the AppUserModelID
   `codes.tanis.tterm`), an optional desktop icon, and two tasks checked by default: `tterm` on
   the user `PATH` (removed on uninstall) and "Open in Tanis Terminal" in the Explorer menu of a

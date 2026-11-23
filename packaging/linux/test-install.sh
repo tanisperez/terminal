@@ -149,7 +149,7 @@ check "purge" run --uninstall --purge >/dev/null
 check "settings purged" test ! -e "$tmp/home/.config/tterm"
 check "logs purged" test ! -e "$tmp/home/.local/state/tterm"
 
-# A copy owned by a package manager blocks the script.
+# A copy in /usr/bin the script did not install blocks it.
 mkdir -p "$tmp/usr/bin"
 touch "$tmp/usr/bin/tterm"
 check "a packaged copy is refused" refused run

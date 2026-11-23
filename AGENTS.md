@@ -70,7 +70,8 @@ Expo/React Native conventions here.
   (creation and reads), with the breakdown in the tooltip. Open sessions are the tabs running
   `claude`.
 - Packaging and updates (#11, decided on 2026-11-23): copied from ted (`docs/releasing.md`).
-  The Linux packages are named `tterm`, as the binary. The macOS bundle is `tterm.app`, shown as
+  Linux gets the tarball and the self-updating install script only: no deb, rpm, Arch package,
+  AppImage or AUR (decided on 2026-11-23). The macOS bundle is `tterm.app`, shown as
   Tanis Terminal, and `telaio-update`'s `app_name` is `tterm`, so its folders match the
   binary's (`tterm/updates` in the cache). The Windows installer is per user in
   `%LOCALAPPDATA%\Programs\tterm`, with "Open in Tanis Terminal" on folders. No document types
