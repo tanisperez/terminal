@@ -48,6 +48,12 @@ _version: 2
 "settings.cursor.underline":
   en: "Underline"
   es: "Subrayado"
+"settings.cursor_blink.label":
+  en: "Blinking cursor"
+  es: "Cursor parpadeante"
+"settings.cursor_blink.description":
+  en: "Stops blinking after 15 s without typing, as kitty."
+  es: "Deja de parpadear tras 15 s sin escribir, como kitty."
 "settings.input":
   en: "Input"
   es: "Entrada"

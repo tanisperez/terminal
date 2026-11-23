@@ -258,6 +258,19 @@ fn appearance_section(
                 }),
         );
     }
+    let blink_weak = weak.clone();
+    let blink = switch_halo(
+        "settings-cursor-blink-halo",
+        Switch::new("settings-cursor-blink")
+            .checked(settings.cursor_blink)
+            .on_click(move |checked, window, cx| {
+                let checked = *checked;
+                update(&blink_weak, window, cx, |settings| {
+                    settings.cursor_blink = checked
+                })
+            }),
+        palette,
+    );
     v_flex()
         .gap(px(14.0))
         .child(SectionHeading::new(t!("settings.appearance")))
@@ -271,6 +284,10 @@ fn appearance_section(
                 .child(font_size),
         ))
         .child(LabeledRow::new(t!("settings.cursor.label"), cursor))
+        .child(
+            LabeledRow::new(t!("settings.cursor_blink.label"), blink)
+                .description(t!("settings.cursor_blink.description")),
+        )
         .into_any_element()
 }
 

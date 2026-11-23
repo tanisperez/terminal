@@ -131,8 +131,9 @@ writes faster than the window paints is slowed down by the pseudo terminal, not 
 
 The shared rules (section 8) apply in full. On top of that, for tterm:
 
-- An idle terminal does no work: no cursor blink, no timer, no polling. The reader thread sleeps
-  in `read`, the window's task sleeps on the channel.
+- An idle terminal does no work: no timer, no polling. The cursor blinks (`cursor_blink`,
+  on by default, decided on 2026-11-23) only for 15 s after a key or focus, as kitty, then
+  stays shown. The reader thread sleeps in `read`, the window's task sleeps on the channel.
 - `Emulator::frame` only rebuilds the rows libghostty-vt marks dirty; lines are `Arc`s, so a
   frame with one changed row costs one new line.
 - Text is shaped per run with gpui's line cache and a forced cell width, so a frame that did not

@@ -122,6 +122,8 @@ pub struct Settings {
     pub font_size: f32,
     /// The cursor shape.
     pub cursor: CursorChoice,
+    /// Whether the cursor blinks while the user types, as kitty's.
+    pub cursor_blink: bool,
     /// Whether pasting or dropping an image saves it as a PNG and types its path.
     pub paste_images: bool,
     /// Days pasted images are kept before they are deleted at startup.
@@ -148,6 +150,7 @@ impl Default for Settings {
             font: DEFAULT_FONT.to_string(),
             font_size: DEFAULT_FONT_SIZE,
             cursor: CursorChoice::default(),
+            cursor_blink: true,
             paste_images: true,
             pasted_images_days: 14,
             log_level: LogLevel::default(),
@@ -235,6 +238,9 @@ fn parse_settings(content: &str) -> Settings {
     }
     if let Some(value) = text("cursor").and_then(CursorChoice::parse) {
         settings.cursor = value;
+    }
+    if let Some(value) = table.get("cursor_blink").and_then(toml::Value::as_bool) {
+        settings.cursor_blink = value;
     }
     if let Some(value) = table.get("paste_images").and_then(toml::Value::as_bool) {
         settings.paste_images = value;
@@ -327,6 +333,7 @@ mod tests {
             font: "JetBrains Mono".to_string(),
             font_size: 15.0,
             cursor: CursorChoice::Underline,
+            cursor_blink: false,
             paste_images: false,
             pasted_images_days: 30,
             log_level: LogLevel::Debug,

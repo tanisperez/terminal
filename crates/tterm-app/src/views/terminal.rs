@@ -4,7 +4,7 @@
 //! The shell's output is read on a thread of its own and reaches the emulator on the window's
 //! thread through a bounded channel, so a program that writes faster than the window paints is
 //! slowed down by the pseudo terminal instead of growing a queue. Nothing runs while the shell is
-//! quiet: no timer, no polling, a steady cursor.
+//! quiet: no timer, no polling. The cursor blinks only for a while after a key, as kitty's.
 
 use std::io::Read as _;
 use std::path::PathBuf;
@@ -38,6 +38,11 @@ const MAX_BATCH_BYTES: usize = 1 << 20;
 const CHANNEL_CHUNKS: usize = 64;
 /// How long the shell must be quiet before a profile's start command is typed.
 const STARTUP_QUIET: std::time::Duration = std::time::Duration::from_millis(500);
+/// How long the blinking cursor stays shown, and hidden, kitty's `cursor_blink_interval`.
+const BLINK_INTERVAL: std::time::Duration = std::time::Duration::from_millis(500);
+/// Blinks before the cursor stays shown without typing: 15 s, kitty's default
+/// `cursor_stop_blinking_after`, so an idle terminal does no work.
+const BLINKS: u32 = 30;
 /// The thumbnail of a dropped image (design D).
 const DROP_THUMBNAIL_WIDTH: f32 = 224.0;
 const DROP_THUMBNAIL_HEIGHT: f32 = 140.0;
@@ -99,6 +104,12 @@ pub struct TerminalView {
     mouse_pressed: Option<MouseButton>,
     /// Whether a clipboard image is saved and pasted as a path (`paste_images`).
     paste_images: bool,
+    /// Whether the cursor blinks (`cursor_blink`).
+    cursor_blink: bool,
+    /// Whether the blinking cursor is in its hidden half.
+    blink_hidden: bool,
+    /// The blinking that runs while the user types; replaced (and so stopped) on every key.
+    _blink: Task<()>,
     _output: Task<()>,
 }
 
@@ -165,6 +176,9 @@ impl TerminalView {
             ),
             preedit: None,
             paste_images: settings.paste_images,
+            cursor_blink: settings.cursor_blink,
+            blink_hidden: false,
+            _blink: Task::ready(()),
             grid_origin: Point::default(),
             selecting: false,
             mouse_pressed: None,
@@ -266,6 +280,8 @@ impl TerminalView {
         self.font_family = settings.font.clone().into();
         self.font_size = settings.font_size;
         self.paste_images = settings.paste_images;
+        self.cursor_blink = settings.cursor_blink;
+        self.restart_blink(cx);
         if let Err(error) = self.emulator.set_cursor_style(settings.cursor.into()) {
             log::warn!("cursor not changed: {error}");
         }
@@ -349,7 +365,44 @@ impl TerminalView {
     fn on_focus_change(&mut self, focused: bool, cx: &mut Context<Self>) {
         let report = self.emulator.encode_focus(focused);
         self.write(&report);
+        if focused {
+            self.restart_blink(cx);
+        } else {
+            self.stop_blink();
+        }
         cx.notify();
+    }
+
+    /// Shows the cursor and, with `cursor_blink` on, blinks it for [`BLINKS`] intervals. Every
+    /// key restarts it, as kitty; then the cursor stays shown and nothing runs.
+    fn restart_blink(&mut self, cx: &mut Context<Self>) {
+        self.stop_blink();
+        if !self.cursor_blink {
+            return;
+        }
+        self._blink = cx.spawn(async move |view, cx| {
+            for _ in 0..BLINKS {
+                cx.background_executor().timer(BLINK_INTERVAL).await;
+                let blinked = view.update(cx, |view, cx| {
+                    view.blink_hidden = !view.blink_hidden;
+                    cx.notify();
+                });
+                if blinked.is_err() {
+                    return;
+                }
+            }
+            view.update(cx, |view, cx| {
+                view.blink_hidden = false;
+                cx.notify();
+            })
+            .ok();
+        });
+    }
+
+    /// Stops the blinking with the cursor shown.
+    fn stop_blink(&mut self) {
+        self._blink = Task::ready(());
+        self.blink_hidden = false;
     }
 
     fn write(&mut self, bytes: &[u8]) {
@@ -377,6 +430,10 @@ impl TerminalView {
             return;
         }
         self.write(bytes);
+        if self.cursor_blink {
+            self.restart_blink(cx);
+            cx.notify();
+        }
         if !self.frame.scroll.at_bottom() {
             self.emulator.scroll_to_bottom();
             self.refresh_frame();
@@ -787,6 +844,7 @@ impl Render for TerminalView {
             metrics,
             family: self.font_family.clone(),
             focused: self.focus.is_focused(window),
+            blink_hidden: self.blink_hidden,
             indicator: palette.fg_subtle.opacity(0.5),
             selection: palette.accent_subtle,
             preedit: self.preedit.clone(),
@@ -904,6 +962,8 @@ struct PaintData {
     metrics: CellMetrics,
     family: SharedString,
     focused: bool,
+    /// The blinking cursor is in its hidden half.
+    blink_hidden: bool,
     indicator: Hsla,
     selection: Hsla,
     /// Text an input method is composing, drawn at the cursor.
@@ -975,7 +1035,10 @@ fn paint_grid(data: &PaintData, bounds: Bounds<Pixels>, window: &mut Window, cx:
             );
         }
     }
-    if let Some(cursor) = frame.cursor {
+    if let Some(cursor) = frame
+        .cursor
+        .filter(|_| !(data.focused && data.blink_hidden))
+    {
         let at = cell(cursor.col, usize::from(cursor.row));
         let width = metrics.width * if cursor.wide { 2.0 } else { 1.0 };
         let color = rgb(cursor.color);
