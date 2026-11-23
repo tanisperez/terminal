@@ -22,6 +22,8 @@ telaio-ui = { workspace = true }
 telaio-app = { workspace = true }
 tterm-cli = { path = "../tterm-cli" }
 tterm-term = { path = "../tterm-term" }
+tterm-usage = { path = "../tterm-usage" }
+chrono = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

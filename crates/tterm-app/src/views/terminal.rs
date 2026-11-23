@@ -216,6 +216,15 @@ impl TerminalView {
         crate::state::tabs::tab_label(&title, &self.shell, folder.as_deref())
     }
 
+    /// The agent this tab runs in its foreground (Claude Code), for the usage screen.
+    pub fn agent(&self) -> Option<super::usage::AgentTab> {
+        let foreground = self.pty.as_ref()?.foreground()?;
+        (foreground.name == "claude").then(|| super::usage::AgentTab {
+            label: self.label(),
+            cwd: foreground.cwd,
+        })
+    }
+
     /// The folder the shell is in, as last reported, for a new tab to start there.
     pub fn cwd(&self) -> Option<&Path> {
         self.cwd.as_deref()

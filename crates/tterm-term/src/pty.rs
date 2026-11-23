@@ -44,6 +44,15 @@ pub struct SpawnOptions {
     pub rows: u16,
 }
 
+/// The program in the foreground of a terminal.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Foreground {
+    /// Its process name (`claude`, `zsh`).
+    pub name: String,
+    /// The folder it works in.
+    pub cwd: Option<PathBuf>,
+}
+
 /// The app's side of a running pseudo terminal.
 pub struct Pty {
     master: Box<dyn MasterPty + Send>,
@@ -192,6 +201,25 @@ impl Pty {
         }
     }
 
+    /// The program in the foreground of the terminal (the shell, or what it runs: `claude`,
+    /// `vim`), with the folder it works in. Linux only for now, from `/proc`; `None` elsewhere.
+    pub fn foreground(&self) -> Option<Foreground> {
+        #[cfg(target_os = "linux")]
+        {
+            let pid = self.master.process_group_leader()?;
+            let proc_dir = PathBuf::from(format!("/proc/{pid}"));
+            let name = std::fs::read_to_string(proc_dir.join("comm")).ok()?;
+            Some(Foreground {
+                name: name.trim().to_string(),
+                cwd: std::fs::read_link(proc_dir.join("cwd")).ok(),
+            })
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            None
+        }
+    }
+
     /// The process id of the program, when the platform has one.
     pub fn pid(&self) -> Option<u32> {
         self.child.process_id()
@@ -273,6 +301,26 @@ mod tests {
         };
         let (pty, _reader) = spawn(&options).expect("spawn");
         assert_eq!(pty.echo(), Some(true));
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn the_foreground_program_is_known() {
+        let options = SpawnOptions {
+            command: vec!["/bin/sleep".into(), "2".into()],
+            cwd: Some(PathBuf::from("/tmp")),
+            cols: 40,
+            rows: 5,
+            ..SpawnOptions::default()
+        };
+        let (pty, _reader) = spawn(&options).expect("spawn");
+        std::thread::sleep(std::time::Duration::from_millis(200));
+        let foreground = pty.foreground().expect("a foreground program");
+        assert_eq!(foreground.name, "sleep");
+        assert_eq!(
+            foreground.cwd.as_deref(),
+            Some(std::path::Path::new("/tmp"))
+        );
     }
 
     #[test]

@@ -14,8 +14,8 @@ use gpui_kit::*;
 use rust_i18n::t;
 
 use crate::actions::{
-    CONTEXT, CloseTab, NewTab, NextTab, OpenProfile, OpenSettings, PreviousTab, ZoomIn, ZoomOut,
-    ZoomReset,
+    CONTEXT, CloseTab, NewTab, NextTab, OpenProfile, OpenSettings, OpenUsage, PreviousTab, ZoomIn,
+    ZoomOut, ZoomReset,
 };
 use crate::state::profiles::{self, Profile, Profiles};
 use crate::state::settings::{
@@ -29,6 +29,7 @@ use crate::theme::metrics::{
 use crate::theme::{Palette, PaletteExt as _, TerminalColors as _};
 
 use super::terminal::{TerminalEvent, TerminalView};
+use super::usage::{UsageEvent, UsageView};
 
 /// The root view of the window.
 pub struct AppView {
@@ -44,6 +45,8 @@ pub struct AppView {
     pub(crate) profiles: Profiles,
     /// The font size of this session: Settings' size, changed by the zoom shortcuts.
     font_size: f32,
+    /// The agent usage screen, when it is open in place of the terminals.
+    usage: Option<(Entity<UsageView>, Subscription)>,
     /// The category the Settings dialog shows.
     pub(crate) settings_category: super::settings::Category,
     _subscriptions: Vec<Subscription>,
@@ -74,6 +77,7 @@ impl AppView {
             profiles: Profiles::default(),
             font_size,
             settings_category: super::settings::Category::default(),
+            usage: None,
             _subscriptions: Vec::new(),
         };
         view.rebuild_profiles();
@@ -106,7 +110,10 @@ impl AppView {
         }
         view.tabs.activate(0);
         view.focus_active(window, cx);
-        // Debug hook (AGENTS.md): start with Settings open on a page.
+        // Debug hooks (AGENTS.md): start on the usage screen, or with Settings open on a page.
+        if std::env::var("TTERM_OPEN").is_ok_and(|open| open.trim() == "usage") {
+            view.open_usage(&OpenUsage, window, cx);
+        }
         if let Some(category) = std::env::var("TTERM_OPEN")
             .ok()
             .and_then(|open| super::settings::Category::from_hook(&open))
@@ -266,6 +273,31 @@ impl AppView {
         self.set_font_size(self.settings.font_size, cx);
     }
 
+    fn open_usage(&mut self, _: &OpenUsage, window: &mut Window, cx: &mut Context<Self>) {
+        if self.usage.is_some() {
+            return;
+        }
+        let tabs = self
+            .tabs
+            .iter()
+            .filter_map(|tab| tab.read(cx).agent())
+            .collect();
+        let usage = cx.new(|cx| UsageView::new(tabs, cx));
+        let subscription =
+            cx.subscribe_in(&usage, window, |view, _, event, window, cx| match event {
+                UsageEvent::Close => view.close_usage(window, cx),
+            });
+        usage.read(cx).focus_handle(cx).focus(window, cx);
+        self.usage = Some((usage, subscription));
+        cx.notify();
+    }
+
+    fn close_usage(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.usage = None;
+        self.focus_active(window, cx);
+        cx.notify();
+    }
+
     fn open_settings(&mut self, _: &OpenSettings, window: &mut Window, cx: &mut Context<Self>) {
         super::settings::open(cx.weak_entity(), window, cx);
     }
@@ -343,7 +375,10 @@ impl AppView {
                     .mr(px(2.0))
                     .tooltip(|window, cx| {
                         Tooltip::new(SharedString::from(t!("usage.open"))).build(window, cx)
-                    }),
+                    })
+                    .on_click(
+                        cx.listener(|view, _, window, cx| view.open_usage(&OpenUsage, window, cx)),
+                    ),
             ))
             .child(no_drag(
                 bar_button("settings", IconName::Settings, palette)
@@ -500,6 +535,15 @@ impl Render for AppView {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let palette = cx.palette();
         let active = self.tabs.active().cloned();
+        // The usage screen takes the whole window; the terminals keep running behind it.
+        if let Some((usage, _)) = self.usage.as_ref() {
+            return v_flex()
+                .key_context(CONTEXT)
+                .size_full()
+                .on_action(cx.listener(Self::open_settings))
+                .child(usage.clone())
+                .into_any_element();
+        }
         v_flex()
             .key_context(CONTEXT)
             .size_full()
@@ -514,6 +558,7 @@ impl Render for AppView {
             .on_action(cx.listener(Self::zoom_out))
             .on_action(cx.listener(Self::zoom_reset))
             .on_action(cx.listener(Self::open_settings))
+            .on_action(cx.listener(Self::open_usage))
             .child(self.render_bar(&palette, cx))
             .child(
                 div()
@@ -521,5 +566,6 @@ impl Render for AppView {
                     .min_h_0()
                     .when_some(active, |area, terminal| area.child(terminal)),
             )
+            .into_any_element()
     }
 }

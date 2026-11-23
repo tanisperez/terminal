@@ -6,6 +6,3 @@ _version: 2
 "tabs.close":
   en: "Close tab"
   es: "Cerrar pestaña"
-"usage.open":
-  en: "Agent usage"
-  es: "Uso de agentes"

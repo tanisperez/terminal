@@ -6924,6 +6924,7 @@ name = "tterm-app"
 version = "0.1.0-dev"
 dependencies = [
  "async-channel",
+ "chrono",
  "gpui-kit",
  "log",
  "pretty_assertions",
@@ -6935,6 +6936,7 @@ dependencies = [
  "toml 1.2.2+spec-1.1.0",
  "tterm-cli",
  "tterm-term",
+ "tterm-usage",
 ]
 
 [[package]]
@@ -6954,6 +6956,18 @@ dependencies = [
  "portable-pty",
  "pretty_assertions",
  "thiserror 2.0.21",
+]
+
+[[package]]
+name = "tterm-usage"
+version = "0.1.0-dev"
+dependencies = [
+ "chrono",
+ "log",
+ "pretty_assertions",
+ "serde",
+ "serde_json",
+ "tempfile",
 ]
 
 [[package]]

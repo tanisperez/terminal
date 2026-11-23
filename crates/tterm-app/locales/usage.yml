@@ -1,0 +1,128 @@
+# The agent usage screen (design H2).
+_version: 2
+"usage.open":
+  en: "Agent usage"
+  es: "Uso de agentes"
+"usage.title":
+  en: "Agents"
+  es: "Agentes"
+"usage.back":
+  en: "Terminal"
+  es: "Terminal"
+"usage.today":
+  en: "today"
+  es: "hoy"
+"usage.period.days7":
+  en: "7 days"
+  es: "7 días"
+"usage.period.days30":
+  en: "30 days"
+  es: "30 días"
+"usage.period.days90":
+  en: "90 days"
+  es: "90 días"
+"usage.period.all":
+  en: "All"
+  es: "Todo"
+"usage.loading":
+  en: "Reading the agent logs…"
+  es: "Leyendo los registros de los agentes…"
+"usage.empty":
+  en: "No agent usage yet"
+  es: "Aún no hay uso de agentes"
+"usage.empty_description":
+  en: "The usage of Claude Code shows here once it has run on this computer (~/.claude/projects)."
+  es: "El uso de Claude Code aparece aquí cuando se haya usado en este equipo (~/.claude/projects)."
+"usage.now":
+  en: "Now"
+  es: "Ahora"
+"usage.open_sessions.one":
+  en: "%{count} open session"
+  es: "%{count} sesión abierta"
+"usage.open_sessions.other":
+  en: "%{count} open sessions"
+  es: "%{count} sesiones abiertas"
+"usage.no_sessions":
+  en: "No tab is running an agent."
+  es: "Ninguna pestaña está ejecutando un agente."
+"usage.working":
+  en: "Working"
+  es: "Trabajando"
+"usage.waiting":
+  en: "Waiting"
+  es: "En espera"
+"usage.input":
+  en: "Input"
+  es: "Entrada"
+"usage.output":
+  en: "Output"
+  es: "Salida"
+"usage.tasks":
+  en: "Tasks"
+  es: "Tareas"
+"usage.time":
+  en: "Time"
+  es: "Tiempo"
+"usage.input_detail":
+  en: "%{fresh} fresh · %{writes} cache writes · %{reads} cache reads"
+  es: "%{fresh} nuevos · %{writes} escritos en caché · %{reads} leídos de caché"
+"usage.per_day":
+  en: "Tokens per day"
+  es: "Tokens por día"
+"usage.days_detail":
+  en: "%{active} of %{days} days with agents · %{per_day}/day"
+  es: "%{active} de %{days} días con agentes · %{per_day}/día"
+"usage.input_lower":
+  en: "input"
+  es: "entrada"
+"usage.output_lower":
+  en: "output"
+  es: "salida"
+"usage.models":
+  en: "Models"
+  es: "Modelos"
+"usage.models_detail":
+  en: "input tokens"
+  es: "tokens de entrada"
+"usage.more_models.one":
+  en: "%{count} more"
+  es: "%{count} más"
+"usage.more_models.other":
+  en: "%{count} more"
+  es: "%{count} más"
+"usage.month.1":
+  en: "Jan"
+  es: "ene"
+"usage.month.2":
+  en: "Feb"
+  es: "feb"
+"usage.month.3":
+  en: "Mar"
+  es: "mar"
+"usage.month.4":
+  en: "Apr"
+  es: "abr"
+"usage.month.5":
+  en: "May"
+  es: "may"
+"usage.month.6":
+  en: "Jun"
+  es: "jun"
+"usage.month.7":
+  en: "Jul"
+  es: "jul"
+"usage.month.8":
+  en: "Aug"
+  es: "ago"
+"usage.month.9":
+  en: "Sep"
+  es: "sept"
+"usage.month.10":
+  en: "Oct"
+  es: "oct"
+"usage.month.11":
+  en: "Nov"
+  es: "nov"
+"usage.month.12":
+  en: "Dec"
+  es: "dic"

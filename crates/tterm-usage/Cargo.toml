@@ -1,0 +1,21 @@
+[package]
+name = "tterm-usage"
+description = "The token usage of coding agents, read from their local logs (Claude Code), for the agent usage screen of Tanis Terminal."
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+log = { workspace = true }
+
+[dev-dependencies]
+pretty_assertions = { workspace = true }
+tempfile = { workspace = true }
+
+[lints]
+workspace = true

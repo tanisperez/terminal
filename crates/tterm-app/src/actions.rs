@@ -32,6 +32,10 @@ actions!(
         ZoomReset,
         /// Opens Settings (`Ctrl+,`, `Cmd+,`).
         OpenSettings,
+        /// Opens the agent usage screen.
+        OpenUsage,
+        /// Closes the agent usage screen (`Esc`).
+        CloseUsage,
     ]
 );
 
@@ -81,6 +85,7 @@ pub fn profile_keys(number: u8) -> Vec<String> {
 /// Binds the app's shortcuts.
 pub fn bind_keys(cx: &mut App) {
     let context = Some(CONTEXT);
+    cx.bind_keys([KeyBinding::new("escape", CloseUsage, Some("UsageScreen"))]);
     cx.bind_keys(
         (1..=crate::state::profiles::MAX_SHORTCUT)
             .zip(PROFILE_KEYS)

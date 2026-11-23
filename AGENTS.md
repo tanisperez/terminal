@@ -81,6 +81,7 @@ depends on `tterm-app`:
 
 ```
 tterm-app ──> tterm-term ──> ghostty-vt, portable-pty
+   ├────────> tterm-usage (agent logs, standalone)
    ├────────> telaio-ui, telaio-app
    └────────> tterm-cli (standalone, depends on no other tterm crate)
 ```
@@ -89,6 +90,10 @@ tterm-app ──> tterm-term ──> ghostty-vt, portable-pty
   `Emulator` wraps libghostty-vt's terminal, turns the shell's output into a plain `Frame`
   (lines of styled runs, background spans, the cursor, the scroll position) and encodes keys,
   pastes and focus reports. No gpui, tested with `cargo test`.
+- `tterm-usage`: the token usage of the agents, read from Claude Code's logs
+  (`~/.claude/projects/**/*.jsonl`, one entry per message id, prompts as tasks) and summed per
+  period and local day for the usage screen. Only usage numbers, never message contents. No gpui.
+  `cargo run --release -p tterm-usage --example scan` prints the totals of this machine.
 - `tterm-cli`: `-h/--help`, `-V/--version` and the folder arguments, `IDENTITY` (the
   `telaio_app::AppIdentity` of tterm), `build.rs` with the commit, as `ted-cli`.
 - `tterm-app`: the gpui binary (`tterm`). `views/terminal.rs` paints a `Frame` and forwards
@@ -118,7 +123,7 @@ The shared rules (section 8) apply in full. On top of that, for tterm:
 - Visual checks in the real app as in the shared rules (section 17): XWayland, `xdotool`,
   `spectacle`, isolated `XDG_CONFIG_HOME` and `XDG_STATE_HOME`, killing only our own PID.
 - Debug hooks, read once at startup: `TTERM_LOG=<level>`, `TTERM_OPEN=<state>` (`settings`,
-  `settings-profiles`, `settings-about`).
+  `settings-profiles`, `settings-about`, `usage`).
 
 ## Working rules
 

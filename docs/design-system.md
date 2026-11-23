@@ -64,8 +64,14 @@ bright black `#8b8e9a`. Programs may change them for a while (OSC 4, 10, 11, 12)
 - **P1, Settings > Profiles**: detected profiles (eye to hide, default badge) and the user's,
   edited in a form (name, shell, start folder, start command, color, shortcut, default).
 - **E, pasted image**: the success notification "Clipboard image pasted".
-- Still to build: D (the drop overlay), H2 (agent usage), W2 (the keyboard profile picker),
-  T (bundled fonts), G (the icon).
+- **H2, agent usage**: in place of the terminals, with its own bar (back to the terminal,
+  "Agents" and the period, the 7/30/90 days/All control, Esc). "Now" lists the tabs running
+  Claude Code (Working while its log was written in the last 15 s); the totals compare with the
+  period before (success up, danger down); the day chart draws input up in `border_hover` and
+  output down in `accent`; the models share one bar (accent, info, success, warning,
+  fg_subtle).
+- Still to build: D (the drop overlay), W2 (the keyboard profile picker), T (bundled fonts),
+  G (the icon).
 
 ## Typography
 
