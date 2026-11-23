@@ -70,8 +70,12 @@ bright black `#8b8e9a`. Programs may change them for a while (OSC 4, 10, 11, 12)
   period before (success up, danger down); the day chart draws input up in `border_hover` and
   output down in `accent`; the models share one bar (accent, info, success, warning,
   fg_subtle).
-- Still to build: D (the drop overlay), W2 (the keyboard profile picker), T (bundled fonts),
-  G (the icon).
+- **W2, profile picker**: Ctrl+Shift+Space (Cmd+Shift+Space on macOS) opens "New tab with…"
+  over a scrim: every profile with its chip, the WSL tag, "default" and its number; arrows,
+  Enter, a number, Esc, and the hints bar of telaio's modals.
+- Tab labels: a user's profile is named by the profile; others by the program's title (a
+  title that is a program path is ignored), or the shell and its folder.
+- Still to build: D (the drop overlay), T (bundled fonts), G (the icon).
 
 ## Typography
 

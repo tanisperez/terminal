@@ -74,7 +74,7 @@ pub struct TerminalView {
     /// Grows with every output while the start command waits, so only the last wait sends it.
     startup_wait: u64,
     _startup: Task<()>,
-    /// The name of the user's profile the tab runs, its label while the program sets no title.
+    /// The name of the user's profile the tab runs, which is its label.
     profile_name: Option<String>,
     cwd: Option<PathBuf>,
     /// Lines of a smooth scroll (a touchpad) not scrolled yet.
@@ -213,11 +213,8 @@ impl TerminalView {
     /// The label of the tab: the title the program set, or the shell and its folder.
     pub fn label(&self) -> String {
         let title = self.emulator.title();
-        if let Some(name) = self
-            .profile_name
-            .as_ref()
-            .filter(|_| title.trim().is_empty())
-        {
+        // A profile of the user is named by the user: the tab keeps that name (A1, M1).
+        if let Some(name) = self.profile_name.as_ref() {
             return name.clone();
         }
         let home = std::env::home_dir();
