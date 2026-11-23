@@ -6950,6 +6950,7 @@ version = "0.1.0-dev"
 dependencies = [
  "ghostty-vt",
  "log",
+ "nix 0.28.0",
  "portable-pty",
  "pretty_assertions",
  "thiserror 2.0.21",

@@ -35,9 +35,57 @@ actions!(
     ]
 );
 
+/// Opens a tab with the profile of this shortcut number (`Ctrl+Shift+1` to `9`, `Cmd+Alt+1` to
+/// `9` on macOS).
+#[derive(Clone, PartialEq, Debug, gpui_kit::Action)]
+#[action(namespace = tterm, no_json)]
+pub struct OpenProfile(pub u8);
+
+/// The profile shortcuts, as gpui writes them, 1 to 9.
+#[cfg(target_os = "macos")]
+const PROFILE_KEYS: [&str; 9] = [
+    "cmd-alt-1",
+    "cmd-alt-2",
+    "cmd-alt-3",
+    "cmd-alt-4",
+    "cmd-alt-5",
+    "cmd-alt-6",
+    "cmd-alt-7",
+    "cmd-alt-8",
+    "cmd-alt-9",
+];
+#[cfg(not(target_os = "macos"))]
+const PROFILE_KEYS: [&str; 9] = [
+    "ctrl-shift-1",
+    "ctrl-shift-2",
+    "ctrl-shift-3",
+    "ctrl-shift-4",
+    "ctrl-shift-5",
+    "ctrl-shift-6",
+    "ctrl-shift-7",
+    "ctrl-shift-8",
+    "ctrl-shift-9",
+];
+
+/// The keys of a profile shortcut, for the menus (`Ctrl`, `⇧`, `3`).
+pub fn profile_keys(number: u8) -> Vec<String> {
+    let mut keys: Vec<String> = if cfg!(target_os = "macos") {
+        vec!["\u{2325}".into(), "\u{2318}".into()]
+    } else {
+        vec!["Ctrl".into(), "\u{21e7}".into()]
+    };
+    keys.push(number.to_string());
+    keys
+}
+
 /// Binds the app's shortcuts.
 pub fn bind_keys(cx: &mut App) {
     let context = Some(CONTEXT);
+    cx.bind_keys(
+        (1..=crate::state::profiles::MAX_SHORTCUT)
+            .zip(PROFILE_KEYS)
+            .map(|(number, keys)| KeyBinding::new(keys, OpenProfile(number), context)),
+    );
     #[cfg(target_os = "macos")]
     cx.bind_keys([
         KeyBinding::new("cmd-t", NewTab, context),

@@ -117,7 +117,8 @@ The shared rules (section 8) apply in full. On top of that, for tterm:
   frame; the pseudo terminal by running `/bin/sh -c ...`.
 - Visual checks in the real app as in the shared rules (section 17): XWayland, `xdotool`,
   `spectacle`, isolated `XDG_CONFIG_HOME` and `XDG_STATE_HOME`, killing only our own PID.
-- Debug hooks, read once at startup: `TTERM_LOG=<level>`.
+- Debug hooks, read once at startup: `TTERM_LOG=<level>`, `TTERM_OPEN=<state>` (`settings`,
+  `settings-profiles`, `settings-about`).
 
 ## Working rules
 

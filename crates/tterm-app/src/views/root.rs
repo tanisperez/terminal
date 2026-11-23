@@ -14,8 +14,10 @@ use gpui_kit::*;
 use rust_i18n::t;
 
 use crate::actions::{
-    CONTEXT, CloseTab, NewTab, NextTab, OpenSettings, PreviousTab, ZoomIn, ZoomOut, ZoomReset,
+    CONTEXT, CloseTab, NewTab, NextTab, OpenProfile, OpenSettings, PreviousTab, ZoomIn, ZoomOut,
+    ZoomReset,
 };
+use crate::state::profiles::{self, Profile, Profiles};
 use crate::state::settings::{
     FONT_SIZE_STEP, Settings, ThemeChoice, clamp_font_size, save_settings,
 };
@@ -32,6 +34,14 @@ use super::terminal::{TerminalEvent, TerminalView};
 pub struct AppView {
     pub(crate) settings: Settings,
     tabs: Tabs<Entity<TerminalView>>,
+    /// The profiles found on this machine.
+    pub(crate) detected: Vec<Profile>,
+    /// The profile the Profiles page of Settings shows.
+    pub(crate) profile_selection: Option<super::settings_profiles::ProfileSelection>,
+    /// The fields of the user's profile being edited.
+    pub(crate) profile_editor: Option<super::settings_profiles::ProfileEditor>,
+    /// The profiles of the menus, from `detected` and the settings.
+    pub(crate) profiles: Profiles,
     /// The font size of this session: Settings' size, changed by the zoom shortcuts.
     font_size: f32,
     /// The category the Settings dialog shows.
@@ -48,21 +58,65 @@ impl AppView {
         cx: &mut Context<Self>,
     ) -> Self {
         let font_size = settings.font_size;
+        // Detection runs `wsl.exe` on Windows, so it goes to the background there; elsewhere it
+        // only reads `/etc/shells` and the first tab needs it.
+        let detected = if cfg!(windows) {
+            Vec::new()
+        } else {
+            profiles::detect(&t!("profiles.command_prompt"))
+        };
         let mut view = Self {
             settings,
             tabs: Tabs::default(),
+            detected,
+            profile_selection: None,
+            profile_editor: None,
+            profiles: Profiles::default(),
             font_size,
             settings_category: super::settings::Category::default(),
             _subscriptions: Vec::new(),
         };
+        view.rebuild_profiles();
+        let default = view.profiles.default_profile().cloned();
         if dirs.is_empty() {
-            view.open_tab(None, window, cx);
+            view.open_tab(default.as_ref(), None, window, cx);
         }
         for dir in dirs {
-            view.open_tab(Some(dir), window, cx);
+            // A folder from the command line wins over the profile's own.
+            let profile = default.clone().map(|profile| Profile {
+                cwd: None,
+                ..profile
+            });
+            view.open_tab(profile.as_ref(), Some(dir), window, cx);
+        }
+        if cfg!(windows) {
+            let name = t!("profiles.command_prompt").into_owned();
+            cx.spawn(async move |view, cx| {
+                let detected = cx
+                    .background_spawn(async move { profiles::detect(&name) })
+                    .await;
+                view.update(cx, |view, cx| {
+                    view.detected = detected;
+                    view.rebuild_profiles();
+                    cx.notify();
+                })
+                .ok();
+            })
+            .detach();
         }
         view.tabs.activate(0);
         view.focus_active(window, cx);
+        // Debug hook (AGENTS.md): start with Settings open on a page.
+        if let Some(category) = std::env::var("TTERM_OPEN")
+            .ok()
+            .and_then(|open| super::settings::Category::from_hook(&open))
+        {
+            view.settings_category = category;
+            let weak = cx.weak_entity();
+            window.defer(cx, move |window, cx| {
+                super::settings::open(weak, window, cx)
+            });
+        }
         // Settings may follow the system theme: the terminal colors follow the mode.
         view._subscriptions
             .push(cx.observe_window_appearance(window, |view, _, cx| {
@@ -73,12 +127,32 @@ impl AppView {
         view
     }
 
-    /// Opens a tab with the shell in `cwd` and activates it.
-    fn open_tab(&mut self, cwd: Option<PathBuf>, window: &mut Window, cx: &mut Context<Self>) {
+    /// Rebuilds the profiles of the menus from the detected ones and the settings.
+    fn rebuild_profiles(&mut self) {
+        let home = std::env::home_dir();
+        self.profiles = Profiles::build(
+            &self.detected,
+            &self.settings.profiles,
+            &self.settings.hidden_profiles,
+            self.settings.default_profile.as_deref(),
+            home.as_deref(),
+        );
+    }
+
+    /// Opens a tab with `profile` (the login shell when `None`), in its folder or `cwd`, and
+    /// activates it.
+    pub(crate) fn open_tab(
+        &mut self,
+        profile: Option<&Profile>,
+        cwd: Option<PathBuf>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let settings = self.settings.clone();
         let font_size = self.font_size;
+        let cwd = cwd.or_else(|| self.new_tab_folder(cx));
         let terminal = cx.new(|cx| {
-            let mut view = TerminalView::new(cwd, &settings, window, cx);
+            let mut view = TerminalView::new(profile, cwd, &settings, window, cx);
             view.set_font_size(font_size, cx);
             view
         });
@@ -98,6 +172,9 @@ impl AppView {
     ) {
         match event {
             TerminalEvent::Renamed => cx.notify(),
+            TerminalEvent::OpenProfile(number) => {
+                self.open_profile(&OpenProfile(*number), window, cx)
+            }
             TerminalEvent::Exited => {
                 if let Some(index) = self.tabs.position(|tab| tab == terminal) {
                     self.close_tab_at(index, window, cx);
@@ -139,8 +216,17 @@ impl AppView {
     }
 
     fn new_tab(&mut self, _: &NewTab, window: &mut Window, cx: &mut Context<Self>) {
+        let profile = self.profiles.default_profile().cloned();
         let cwd = self.new_tab_folder(cx);
-        self.open_tab(cwd, window, cx);
+        self.open_tab(profile.as_ref(), cwd, window, cx);
+    }
+
+    fn open_profile(&mut self, action: &OpenProfile, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(profile) = self.profiles.by_shortcut(action.0).cloned() else {
+            return;
+        };
+        let cwd = self.new_tab_folder(cx);
+        self.open_tab(Some(&profile), cwd, window, cx);
     }
 
     fn close_tab(&mut self, _: &CloseTab, window: &mut Window, cx: &mut Context<Self>) {
@@ -200,6 +286,8 @@ impl AppView {
         crate::theme::apply_settings(cx, &settings);
         telaio_ui::ThemeChoice::from(settings.theme).apply(Some(window), cx);
         self.font_size = settings.font_size;
+        self.settings = settings.clone();
+        self.rebuild_profiles();
         for tab in self.tabs.iter() {
             tab.update(cx, |tab, cx| {
                 tab.apply_settings(&settings, cx);
@@ -207,7 +295,6 @@ impl AppView {
             });
         }
         log::info!("settings saved");
-        self.settings = settings;
         cx.notify();
     }
 
@@ -242,6 +329,11 @@ impl AppView {
                     })
                     .on_click(cx.listener(|view, _, window, cx| view.new_tab(&NewTab, window, cx))),
             ));
+            if self.profiles.has_choice() {
+                row = row.child(no_drag(div().mt(px(4.0)).child(
+                    super::profile_menu::chevron(cx.weak_entity(), self.profiles.clone(), palette),
+                )));
+            }
         }
         row = row
             .child(div().flex_1())
@@ -414,6 +506,7 @@ impl Render for AppView {
             .bg(palette.terminal_bg())
             .text_color(palette.fg)
             .on_action(cx.listener(Self::new_tab))
+            .on_action(cx.listener(Self::open_profile))
             .on_action(cx.listener(Self::close_tab))
             .on_action(cx.listener(Self::next_tab))
             .on_action(cx.listener(Self::previous_tab))

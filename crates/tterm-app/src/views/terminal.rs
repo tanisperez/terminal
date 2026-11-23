@@ -18,6 +18,7 @@ use tterm_term::{
 };
 
 use crate::actions::{Copy, Paste};
+use crate::state::profiles::{Origin, Profile};
 use crate::state::settings::Settings;
 use crate::theme::metrics::{
     CURSOR_THICKNESS, SCROLL_INDICATOR_WIDTH, TERMINAL_LINE_HEIGHT, TERMINAL_PADDING_X,
@@ -32,6 +33,8 @@ const SCROLLBACK_BYTES: usize = 10_000_000;
 const MAX_BATCH_BYTES: usize = 1 << 20;
 /// How many chunks of output wait between the reader thread and the window.
 const CHANNEL_CHUNKS: usize = 64;
+/// How long the shell must be quiet before a profile's start command is typed.
+const STARTUP_QUIET: std::time::Duration = std::time::Duration::from_millis(500);
 /// How much the reader reads at once.
 const READ_BUFFER: usize = 64 * 1024;
 
@@ -42,6 +45,8 @@ pub enum TerminalEvent {
     Renamed,
     /// The shell exited: its tab closes.
     Exited,
+    /// A profile shortcut gpui could not bind on this keyboard layout (Ctrl+Shift+digit).
+    OpenProfile(u8),
 }
 
 /// The size of one cell for the font in use.
@@ -62,6 +67,14 @@ pub struct TerminalView {
     font_size: f32,
     metrics: Option<(SharedString, f32, CellMetrics)>,
     shell: String,
+    /// The profile's start command, typed once the shell first writes (its prompt), so it is not
+    /// echoed above it.
+    pending_startup: Option<String>,
+    /// Grows with every output while the start command waits, so only the last wait sends it.
+    startup_wait: u64,
+    _startup: Task<()>,
+    /// The name of the user's profile the tab runs, its label while the program sets no title.
+    profile_name: Option<String>,
     cwd: Option<PathBuf>,
     /// Lines of a smooth scroll (a touchpad) not scrolled yet.
     scroll_rest: f32,
@@ -78,8 +91,9 @@ pub struct TerminalView {
 impl EventEmitter<TerminalEvent> for TerminalView {}
 
 impl TerminalView {
-    /// Starts the user's shell in `cwd` (the home folder when `None`).
+    /// Starts `profile` in its folder, or else in `cwd` (the home folder when `None`).
     pub fn new(
+        profile: Option<&Profile>,
         cwd: Option<PathBuf>,
         settings: &Settings,
         window: &mut Window,
@@ -93,8 +107,11 @@ impl TerminalView {
             #[allow(clippy::panic)]
             Err(error) => panic!("could not create the terminal: {error}"),
         };
+        let cwd = profile.and_then(|profile| profile.cwd.clone()).or(cwd);
         let options = SpawnOptions {
-            command: Vec::new(),
+            command: profile
+                .map(|profile| profile.command.iter().map(Into::into).collect())
+                .unwrap_or_default(),
             cwd: cwd.clone(),
             env: pty::terminal_env(tterm_cli::IDENTITY.version),
             cols: size.cols,
@@ -109,7 +126,16 @@ impl TerminalView {
             font_family: settings.font.clone().into(),
             font_size: settings.font_size,
             metrics: None,
-            shell: crate::state::shell::shell_name(),
+            shell: match profile {
+                Some(profile) if !profile.command.is_empty() => profile.name.clone(),
+                _ => crate::state::shell::shell_name(),
+            },
+            pending_startup: profile.and_then(|profile| profile.startup.clone()),
+            startup_wait: 0,
+            _startup: Task::ready(()),
+            profile_name: profile
+                .filter(|profile| profile.origin != Origin::Detected)
+                .map(|profile| profile.name.clone()),
             cwd,
             scroll_rest: 0.0,
             paste_images: settings.paste_images,
@@ -174,12 +200,20 @@ impl TerminalView {
 
     /// The label of the tab: the title the program set, or the shell and its folder.
     pub fn label(&self) -> String {
+        let title = self.emulator.title();
+        if let Some(name) = self
+            .profile_name
+            .as_ref()
+            .filter(|_| title.trim().is_empty())
+        {
+            return name.clone();
+        }
         let home = std::env::home_dir();
         let folder = self
             .cwd
             .as_deref()
             .map(|cwd| crate::state::tabs::folder_name(cwd, home.as_deref()));
-        crate::state::tabs::tab_label(&self.emulator.title(), &self.shell, folder.as_deref())
+        crate::state::tabs::tab_label(&title, &self.shell, folder.as_deref())
     }
 
     /// The folder the shell is in, as last reported, for a new tab to start there.
@@ -227,11 +261,43 @@ impl TerminalView {
                 Effect::Bell | Effect::Notification { .. } => {}
             }
         }
+        if self.pending_startup.is_some() {
+            match self.pty.as_ref().and_then(Pty::echo) {
+                // The line editor has the terminal: the prompt is up.
+                Some(false) => self.send_startup(),
+                Some(true) => {}
+                None => self.schedule_startup(cx),
+            }
+        }
         if renamed {
             cx.emit(TerminalEvent::Renamed);
         }
         self.refresh_frame();
         cx.notify();
+    }
+
+    /// Types the start command. Typed, not run instead of the shell: the tab stays when it exits.
+    fn send_startup(&mut self) {
+        if let Some(startup) = self.pending_startup.take() {
+            self.write(format!("{startup}\r").as_bytes());
+        }
+    }
+
+    /// Where the echo of the terminal cannot be read (Windows), types the start command once the
+    /// shell has been quiet for [`STARTUP_QUIET`], so it is not typed before the prompt. Each
+    /// output restarts the wait; it only runs while a tab opens.
+    fn schedule_startup(&mut self, cx: &mut Context<Self>) {
+        self.startup_wait += 1;
+        let wait = self.startup_wait;
+        self._startup = cx.spawn(async move |view, cx| {
+            cx.background_executor().timer(STARTUP_QUIET).await;
+            view.update(cx, |view, _| {
+                if view.startup_wait == wait {
+                    view.send_startup();
+                }
+            })
+            .ok();
+        });
     }
 
     fn on_exit(&mut self, cx: &mut Context<Self>) {
@@ -280,6 +346,27 @@ impl TerminalView {
 
     fn on_key_down(&mut self, event: &KeyDownEvent, cx: &mut Context<Self>) {
         let keystroke = &event.keystroke;
+        log::trace!(
+            "key {:?} char {:?} ctrl {} alt {} shift {}",
+            keystroke.key,
+            keystroke.key_char,
+            keystroke.modifiers.control,
+            keystroke.modifiers.alt,
+            keystroke.modifiers.shift
+        );
+        // Ctrl+Shift+digit opens a profile. A binding only matches it on a US layout: elsewhere
+        // gpui names the key by its symbol (`periodcentered` for Shift+3 in Spanish).
+        let mods = keystroke.modifiers;
+        if !cfg!(target_os = "macos")
+            && mods.control
+            && mods.shift
+            && !mods.alt
+            && let Some(number) = crate::state::profiles::shifted_digit(&keystroke.key)
+        {
+            cx.stop_propagation();
+            cx.emit(TerminalEvent::OpenProfile(number));
+            return;
+        }
         // Command shortcuts belong to the app and the system on macOS.
         if cfg!(target_os = "macos") && keystroke.modifiers.platform {
             return;

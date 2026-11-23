@@ -48,16 +48,29 @@ pub enum Category {
     /// Theme, font, cursor, pasting.
     #[default]
     General,
+    /// Detected and own profiles.
+    Profiles,
     /// Version and links.
     About,
 }
 
 impl Category {
-    const ALL: [Category; 2] = [Category::General, Category::About];
+    const ALL: [Category; 3] = [Category::General, Category::Profiles, Category::About];
+
+    /// The page of a `TTERM_OPEN` value: `settings`, `settings-profiles`, `settings-about`.
+    pub fn from_hook(value: &str) -> Option<Self> {
+        match value.trim() {
+            "settings" => Some(Category::General),
+            "settings-profiles" => Some(Category::Profiles),
+            "settings-about" => Some(Category::About),
+            _ => None,
+        }
+    }
 
     fn label(self) -> String {
         match self {
             Category::General => t!("settings.category.general"),
+            Category::Profiles => t!("settings.category.profiles"),
             Category::About => t!("settings.category.about"),
         }
         .into_owned()
@@ -100,6 +113,7 @@ fn render(weak: WeakEntity<AppView>, fonts: &[String], cx: &mut App) -> AnyEleme
     let categories = Category::ALL.map(|category| {
         let icon = match category {
             Category::General => IconName::SlidersHorizontal,
+            Category::Profiles => IconName::SquareTerminal,
             Category::About => IconName::Info,
         };
         SettingsCategory::new(icon, category.label())
@@ -111,9 +125,11 @@ fn render(weak: WeakEntity<AppView>, fonts: &[String], cx: &mut App) -> AnyEleme
     let sections = match category {
         Category::General => vec![
             appearance_section(weak.clone(), &settings, fonts, &palette, cx),
+            profile_section(weak.clone(), view, &palette, cx),
             input_section(weak.clone(), &settings, &palette),
             language_section(weak.clone(), settings.language),
         ],
+        Category::Profiles => vec![super::settings_profiles::profiles_section(weak.clone(), cx)],
         Category::About => vec![about_section(&palette, &mono_font)],
     };
     let path = settings_path()
@@ -246,6 +262,54 @@ fn appearance_section(
                 .child(font_size),
         ))
         .child(LabeledRow::new(t!("settings.cursor.label"), cursor))
+        .into_any_element()
+}
+
+/// "Default profile": what Ctrl+Shift+T and the + button open (F).
+fn profile_section(
+    weak: WeakEntity<AppView>,
+    view: &AppView,
+    palette: &Palette,
+    cx: &App,
+) -> AnyElement {
+    let names: Vec<String> = view.profiles.list.iter().map(|p| p.name.clone()).collect();
+    let current = view
+        .profiles
+        .default_profile()
+        .map(|profile| profile.name.clone())
+        .unwrap_or_default();
+    let label = current.clone();
+    let select = select_trigger("settings-default-profile", palette, cx)
+        .w(px(FONT_SELECT_WIDTH))
+        .text_color(palette.fg)
+        .child(select_label_row(div().child(label), palette))
+        .open_on_click()
+        .dropdown_menu(move |menu: PopupMenu, _, _| {
+            let mut menu = menu;
+            for name in &names {
+                let weak = weak.clone();
+                let picked = name.clone();
+                menu = menu.item(menu_choice_item(
+                    name.clone(),
+                    None,
+                    *name == current,
+                    move |window, cx| {
+                        let picked = picked.clone();
+                        update(&weak, window, cx, |settings| {
+                            settings.default_profile = Some(picked)
+                        })
+                    },
+                ));
+            }
+            menu
+        });
+    v_flex()
+        .gap(px(14.0))
+        .child(SectionHeading::new(t!("settings.profile.title")))
+        .child(
+            LabeledRow::new(t!("settings.profile.default"), select)
+                .description(t!("settings.profile.default_description")),
+        )
         .into_any_element()
 }
 

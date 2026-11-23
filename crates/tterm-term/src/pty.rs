@@ -175,6 +175,23 @@ impl Pty {
             .map_err(|error| PtyError::Io(error.to_string()))
     }
 
+    /// Whether the terminal echoes what is typed, `None` where it cannot be read (Windows). A
+    /// shell's line editor (zsh's ZLE, readline, fish) turns echo off while it reads a line, so
+    /// `Some(false)` means the shell is at its prompt.
+    pub fn echo(&self) -> Option<bool> {
+        #[cfg(unix)]
+        {
+            use nix::sys::termios::LocalFlags;
+            self.master
+                .get_termios()
+                .map(|termios| termios.local_flags.contains(LocalFlags::ECHO))
+        }
+        #[cfg(not(unix))]
+        {
+            None
+        }
+    }
+
     /// The process id of the program, when the platform has one.
     pub fn pid(&self) -> Option<u32> {
         self.child.process_id()
@@ -244,6 +261,18 @@ mod tests {
     #[test]
     fn the_program_sees_the_size() {
         assert!(run(&["/bin/sh", "-c", "stty size"]).contains("5 40"));
+    }
+
+    #[test]
+    fn echo_is_on_for_a_plain_program() {
+        let options = SpawnOptions {
+            command: vec!["/bin/sh".into(), "-c".into(), "sleep 1".into()],
+            cols: 40,
+            rows: 5,
+            ..SpawnOptions::default()
+        };
+        let (pty, _reader) = spawn(&options).expect("spawn");
+        assert_eq!(pty.echo(), Some(true));
     }
 
     #[test]

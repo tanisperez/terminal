@@ -1,0 +1,83 @@
+# Profiles: the menu of the bar and the Profiles page of Settings.
+_version: 2
+"profiles.choose":
+  en: "Choose the profile of the new tab"
+  es: "Elegir perfil de la nueva pestaña"
+"profiles.configure":
+  en: "Configure profiles…"
+  es: "Configurar perfiles…"
+"profiles.default":
+  en: "default"
+  es: "predeterminado"
+"profiles.command_prompt":
+  en: "Command Prompt"
+  es: "Símbolo del sistema"
+"profiles.description":
+  en: "What a new tab runs. Detected profiles come from this computer; yours are saved in settings.toml."
+  es: "Lo que ejecuta una pestaña nueva. Los detectados salen de este equipo; los tuyos se guardan en settings.toml."
+"profiles.detected":
+  en: "Detected"
+  es: "Detectados"
+"profiles.mine":
+  en: "Mine"
+  es: "Míos"
+"profiles.new":
+  en: "New profile"
+  es: "Nuevo perfil"
+"profiles.new_name":
+  en: "New profile"
+  es: "Nuevo perfil"
+"profiles.pick":
+  en: "Choose a profile to see it."
+  es: "Elige un perfil para verlo."
+"profiles.show":
+  en: "Show in the menus"
+  es: "Mostrar en los menús"
+"profiles.hide":
+  en: "Hide from the menus"
+  es: "Ocultar de los menús"
+"profiles.show_in_menus":
+  en: "Show in the menus"
+  es: "Mostrar en los menús"
+"profiles.name":
+  en: "Name"
+  es: "Nombre"
+"profiles.shell":
+  en: "Shell"
+  es: "Shell"
+"profiles.shell_placeholder":
+  en: "The login shell"
+  es: "La shell de inicio de sesión"
+"profiles.login_shell":
+  en: "The login shell"
+  es: "La shell de inicio de sesión"
+"profiles.cwd":
+  en: "Start folder"
+  es: "Carpeta inicial"
+"profiles.cwd_placeholder":
+  en: "The folder of the active tab"
+  es: "La carpeta de la pestaña activa"
+"profiles.startup":
+  en: "Start command"
+  es: "Comando de inicio"
+"profiles.startup_description":
+  en: "Runs when the tab opens. Handy to start an agent right away."
+  es: "Se ejecuta al abrir la pestaña. Útil para lanzar un agente directamente."
+"profiles.color":
+  en: "Color"
+  es: "Color"
+"profiles.shortcut":
+  en: "Shortcut"
+  es: "Atajo"
+"profiles.shortcut_none":
+  en: "None"
+  es: "Ninguno"
+"profiles.use_default":
+  en: "Use when opening a new tab"
+  es: "Usar al abrir una pestaña nueva"
+"profiles.use_default_description":
+  en: "What the + button and the new tab shortcut open."
+  es: "Lo que abre el botón + y el atajo de nueva pestaña."
+"profiles.delete":
+  en: "Delete profile"
+  es: "Eliminar perfil"

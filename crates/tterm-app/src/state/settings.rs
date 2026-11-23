@@ -12,6 +12,7 @@ use serde::Serialize;
 
 use super::config::config_dir;
 use super::locale::LanguageChoice;
+use super::profiles::ProfileConfig;
 
 pub use telaio_app::logging::LogLevel;
 
@@ -127,6 +128,13 @@ pub struct Settings {
     pub pasted_images_days: u32,
     /// How much is written to the log file.
     pub log_level: LogLevel,
+    /// The name of the profile a new tab opens; the first one when absent or unknown.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default_profile: Option<String>,
+    /// Detected profiles left out of the menus.
+    pub hidden_profiles: Vec<String>,
+    /// The user's own profiles. Last: TOML writes tables after the plain values.
+    pub profiles: Vec<ProfileConfig>,
 }
 
 impl Default for Settings {
@@ -140,6 +148,9 @@ impl Default for Settings {
             paste_images: true,
             pasted_images_days: 14,
             log_level: LogLevel::default(),
+            default_profile: None,
+            hidden_profiles: Vec::new(),
+            profiles: Vec::new(),
         }
     }
 }
@@ -230,6 +241,26 @@ fn parse_settings(content: &str) -> Settings {
     {
         settings.pasted_images_days = value.clamp(1, 365) as u32;
     }
+    if let Some(value) = text("default_profile").filter(|name| !name.trim().is_empty()) {
+        settings.default_profile = Some(value.trim().to_string());
+    }
+    if let Some(list) = table.get("hidden_profiles").and_then(toml::Value::as_array) {
+        settings.hidden_profiles = list
+            .iter()
+            .filter_map(toml::Value::as_str)
+            .map(String::from)
+            .collect();
+    }
+    if let Some(list) = table.get("profiles").and_then(toml::Value::as_array) {
+        for profile in list.iter().filter_map(toml::Value::as_table) {
+            match ProfileConfig::from_toml(profile) {
+                Some(config) if !settings.profiles.iter().any(|p| p.name == config.name) => {
+                    settings.profiles.push(config)
+                }
+                _ => log::warn!("ignoring a profile without a name or with a repeated one"),
+            }
+        }
+    }
     if let Some(value) = text("log_level").and_then(LogLevel::parse) {
         settings.log_level = value;
     }
@@ -292,6 +323,23 @@ mod tests {
             paste_images: false,
             pasted_images_days: 30,
             log_level: LogLevel::Debug,
+            default_profile: Some("claude · telaio".to_string()),
+            hidden_profiles: vec!["fish".to_string()],
+            profiles: vec![
+                ProfileConfig {
+                    name: "claude · telaio".to_string(),
+                    cwd: Some("~/dev/telaio".to_string()),
+                    startup: Some("claude".to_string()),
+                    shortcut: Some(3),
+                    ..ProfileConfig::default()
+                },
+                ProfileConfig {
+                    name: "ssh · servidor".to_string(),
+                    startup: Some("ssh tanis@servidor".to_string()),
+                    color: crate::state::profiles::ProfileColor::Green,
+                    ..ProfileConfig::default()
+                },
+            ],
         };
         write_settings(dir.path(), &settings);
         assert_eq!(read_settings(dir.path()), settings);

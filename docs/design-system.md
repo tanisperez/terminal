@@ -57,8 +57,15 @@ bright black `#8b8e9a`. Programs may change them for a while (OSC 4, 10, 11, 12)
 - **F, Settings**: telaio's Settings dialog. General: theme (Dark, Light, System), font and size,
   cursor (Block, Bar, Underline), paste images, language. About: version, libghostty-vt
   version, privacy line.
-- Still to build: D and E (dropping and pasting screenshots), H2 (agent usage), profiles (P1,
-  W1, W2, M1, U's chevron), T (bundled fonts), G (the icon).
+- **M1, W1, U, profiles menu**: the chevron next to + (only with several profiles) opens every
+  profile with its chip (`ProfileColor`: indigo, green, blue, yellow, gray from the palette's
+  accent, success, info, warning and fg_subtle), its tag (WSL or the start program), "default"
+  and its shortcut keys, then "Configure profiles…".
+- **P1, Settings > Profiles**: detected profiles (eye to hide, default badge) and the user's,
+  edited in a form (name, shell, start folder, start command, color, shortcut, default).
+- **E, pasted image**: the success notification "Clipboard image pasted".
+- Still to build: D (the drop overlay), H2 (agent usage), W2 (the keyboard profile picker),
+  T (bundled fonts), G (the icon).
 
 ## Typography
 

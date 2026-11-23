@@ -72,3 +72,15 @@ _version: 2
 "settings.about.privacy":
   en: "Tanis Terminal connects to nothing on its own."
   es: "Tanis Terminal no se conecta a nada por su cuenta."
+"settings.category.profiles":
+  en: "Profiles"
+  es: "Perfiles"
+"settings.profile.title":
+  en: "Profile"
+  es: "Perfil"
+"settings.profile.default":
+  en: "Default profile"
+  es: "Perfil predeterminado"
+"settings.profile.default_description":
+  en: "The one the new tab shortcut opens. They are edited in Profiles."
+  es: "El que abre el atajo de nueva pestaña. Se editan en Perfiles."

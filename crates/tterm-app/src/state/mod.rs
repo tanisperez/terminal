@@ -3,6 +3,7 @@
 pub mod config;
 pub mod images;
 pub mod locale;
+pub mod profiles;
 pub mod settings;
 pub mod shell;
 pub mod tabs;
