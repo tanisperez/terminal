@@ -31,9 +31,26 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # The pages, install.sh and the user docs (#12).
+      # Generates site/docs/ from site/docs-src/. Fails on a broken link or anchor between pages.
+      - name: Build the documentation
+        run: python3 site/docs-src/build.py
+
+      # site/docs-src holds the sources of site/docs, not pages.
       - name: Assemble the site
-        run: rsync -a --exclude README.md site/ _site/
+        run: rsync -a --exclude docs-src/ --exclude README.md site/ _site/
+
+      # The download buttons point at the files of the latest stable release, and the pages show
+      # its version. Without a stable release they keep linking to the releases page.
+      - name: Link the downloads to the latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag=$(gh release view --json tagName -q .tagName 2>/dev/null || true)
+          if [ -z "$tag" ]; then
+            echo "No stable release yet, the downloads link to the releases page."
+            exit 0
+          fi
+          python3 site/docs-src/release_links.py _site "$tag"
 
       - uses: actions/configure-pages@v6
 

@@ -1,0 +1,58 @@
+title: Settings
+description: Every setting of Tanis Terminal, in the Settings window and in settings.toml, with where the file lives on each system.
+---
+<h1>Settings</h1>
+<p class="lead">Open Settings with the gear button of the bar or <kbd>Ctrl</kbd> <kbd>,</kbd>. Every change applies at once and is saved to <code>settings.toml</code>, a plain text file you can also edit by hand.</p>
+
+<h2>Where the file lives</h2>
+<ul>
+    <li><strong>Linux:</strong> <code>~/.config/tterm/settings.toml</code> (or under <code>$XDG_CONFIG_HOME</code>)</li>
+    <li><strong>macOS:</strong> <code>~/Library/Application Support/tterm/settings.toml</code></li>
+    <li><strong>Windows:</strong> <code>%APPDATA%\tterm\settings.toml</code></li>
+</ul>
+<p>Settings, General shows the path of yours. A value that is missing or not valid takes its default.</p>
+
+<h2>General</h2>
+<table>
+    <thead><tr><th>Key</th><th>Values</th><th>Default</th></tr></thead>
+    <tbody>
+        <tr><td><code>theme</code></td><td><code>dark</code>, <code>light</code> or <code>system</code></td><td><code>dark</code></td></tr>
+        <tr><td><code>font</code></td><td>A monospace font name</td><td><code>Noto Sans Mono</code></td></tr>
+        <tr><td><code>font_size</code></td><td>Points, 8 to 32</td><td><code>12</code></td></tr>
+        <tr><td><code>cursor</code></td><td><code>block</code>, <code>bar</code> or <code>underline</code></td><td><code>block</code></td></tr>
+        <tr><td><code>cursor_blink</code></td><td><code>true</code> or <code>false</code>. It blinks for 15 seconds after a key, then stays still</td><td><code>true</code></td></tr>
+        <tr><td><code>paste_images</code></td><td><code>true</code> or <code>false</code>. Pasted screenshots become PNG files and their path is typed</td><td><code>true</code></td></tr>
+        <tr><td><code>pasted_images_days</code></td><td>Days a pasted image is kept, 1 to 365</td><td><code>14</code></td></tr>
+        <tr><td><code>language</code></td><td><code>auto</code> (the system's), <code>en</code> or <code>es</code></td><td><code>auto</code></td></tr>
+        <tr><td><code>check_updates</code></td><td><code>true</code> or <code>false</code>. Look for a new version once after startup</td><td><code>true</code></td></tr>
+        <tr><td><code>log_level</code></td><td><code>off</code>, <code>error</code>, <code>warn</code>, <code>info</code>, <code>debug</code> or <code>trace</code></td><td><code>info</code></td></tr>
+    </tbody>
+</table>
+<p>Noto Sans Mono, JetBrains Mono, Cascadia Code, Fira Code and Geist Mono come with Tanis Terminal and work on every system; the font list also offers the monospace fonts you have installed.</p>
+
+<h2 id="profiles">Profiles</h2>
+<p>Settings, Profiles edits them; in the file they look like this:</p>
+```toml title="settings.toml"
+default_profile = "claude · telaio"
+hidden_profiles = ["fish"]
+
+[[profiles]]
+name = "claude · telaio"
+cwd = "~/dev/telaio"
+startup = "claude"
+color = "indigo"
+shortcut = 3
+```
+<table>
+    <thead><tr><th>Key</th><th>Meaning</th></tr></thead>
+    <tbody>
+        <tr><td><code>default_profile</code></td><td>The profile a new tab opens. The first one when missing.</td></tr>
+        <tr><td><code>hidden_profiles</code></td><td>Detected shells left out of the menus.</td></tr>
+        <tr><td><code>name</code></td><td>The name of the profile and of its tabs.</td></tr>
+        <tr><td><code>shell</code></td><td>The program to run. Your default shell when missing.</td></tr>
+        <tr><td><code>cwd</code></td><td>The folder the tab starts in; <code>~</code> is your home.</td></tr>
+        <tr><td><code>startup</code></td><td>A command typed into the shell once it is ready.</td></tr>
+        <tr><td><code>color</code></td><td><code>indigo</code>, <code>green</code>, <code>blue</code>, <code>yellow</code> or <code>gray</code>.</td></tr>
+        <tr><td><code>shortcut</code></td><td>1 to 9: <kbd>Ctrl</kbd> <kbd>Shift</kbd> and that number opens it.</td></tr>
+    </tbody>
+</table>

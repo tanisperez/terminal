@@ -1,0 +1,25 @@
+title: Troubleshooting
+description: Common problems with Tanis Terminal and how to solve them, and where its log file is.
+---
+<h1>Troubleshooting</h1>
+<p class="lead">If something does not work, the log usually says why. When it does not, <a href="https://github.com/tanisperez/terminal/issues">open an issue</a> with the log attached.</p>
+
+<h2 id="log">The log file</h2>
+<ul>
+    <li><strong>Linux:</strong> <code>~/.local/state/tterm/tterm.log</code></li>
+    <li><strong>macOS:</strong> <code>~/Library/Logs/Tanis Terminal/</code></li>
+    <li><strong>Windows:</strong> <code>%LOCALAPPDATA%\Tanis Terminal\logs\</code></li>
+</ul>
+<p>For more detail, start it with <code>TTERM_LOG=debug tterm</code>. The log never holds what you type or the output of your programs.</p>
+
+<h2>macOS or Windows will not open it</h2>
+<p>Tanis Terminal is not code signed yet. On macOS, open System Settings, Privacy and Security, and choose <strong>Open Anyway</strong>. On Windows, in the SmartScreen warning choose <strong>More info</strong> and <strong>Run anyway</strong>.</p>
+
+<h2>A program shows the wrong characters or colors</h2>
+<p>Programs see <code>TERM=xterm-ghostty</code>. Over SSH, the remote machine may not know that terminal type; copy Ghostty's terminfo there, or set <code>TERM=xterm-256color</code> on that machine.</p>
+
+<h2>Ctrl+V does not reach my program</h2>
+<p><kbd>Ctrl</kbd> <kbd>V</kbd> pastes, so programs do not receive it. Shells offer the same quoted insert on another key; see <a href="copy-paste-and-links.html">Copy, paste and links</a>.</p>
+
+<h2>A new tab does not start in my folder</h2>
+<p>The folder comes from the shell integration of bash, zsh and fish. A shell whose startup files replace the prompt hooks, or a WSL distribution on Windows, may not report it. See <a href="tabs-and-profiles.html#shell-integration">Shell integration</a>.</p>

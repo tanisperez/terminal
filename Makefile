@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help run build release check lint lint-fix format format-check test clean
+.PHONY: help run build release check lint lint-fix format format-check test clean docs
 
 help:
 	@echo "Usage: make [target]"
@@ -15,6 +15,7 @@ help:
 	@echo "  format-check  Check formatting without modifying files"
 	@echo "  test          Run all tests"
 	@echo "  clean         Remove build artifacts"
+	@echo "  docs          Build the user documentation of the website into site/docs/"
 	@echo ""
 	@echo "libghostty-vt is built from source with Zig 0.17 on Linux (pacman -S zig)."
 
@@ -47,3 +48,6 @@ test:
 
 clean:
 	cargo clean
+
+docs:
+	python3 site/docs-src/build.py

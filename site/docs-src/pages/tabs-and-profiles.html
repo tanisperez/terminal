@@ -1,0 +1,44 @@
+title: Tabs and profiles
+description: How tabs work in Tanis Terminal, which shells it finds, and how to add profiles with a folder, a startup command, a color and a shortcut.
+---
+<h1>Tabs and profiles</h1>
+<p class="lead">The tab bar is the title bar of the window. It always shows, with one tab too, so the new tab button and your profiles are at hand.</p>
+
+<h2>Tabs</h2>
+<p>A tab is named after the title the running program sets, or else after its shell and folder (<code>zsh · terminal</code>). A tab opened from a profile of yours keeps the profile's name.</p>
+<ul>
+    <li>A new tab starts in the folder of the active one. The shell reports it through its <a href="#shell-integration">integration</a>; on Linux, Tanis Terminal also reads it from the running program.</li>
+    <li>Drag a tab onto another to put it in that place, or past the last tab to move it to the end. An accent line marks where it lands.</li>
+    <li>Right click a tab for <strong>Close</strong>, <strong>Close others</strong>, <strong>Close to the right</strong>, <strong>Close to the left</strong> and <strong>Close all</strong>.</li>
+    <li>When the only tab closes, the window closes. A single tab has no close button for that reason.</li>
+</ul>
+
+<h2>Detected shells</h2>
+<p>When Tanis Terminal starts, it lists the shells of your machine as profiles:</p>
+<ul>
+    <li><strong>Linux and macOS:</strong> your login shell and the other shells installed (bash, zsh, fish and others).</li>
+    <li><strong>Windows:</strong> every WSL distribution, PowerShell and the Command Prompt.</li>
+</ul>
+<p>Detected profiles are not written to your settings. Hide the ones you do not use in Settings, Profiles.</p>
+
+<h2>Your own profiles</h2>
+<p>In Settings, Profiles, add a profile with:</p>
+<ul>
+    <li><strong>Name</strong>, the name of its tabs.</li>
+    <li><strong>Shell</strong>, the program to run, or the default shell.</li>
+    <li><strong>Folder</strong>, where the tab starts.</li>
+    <li><strong>Startup command</strong>, typed into the shell once it is ready, for example <code>claude</code>. The shell keeps running after the command ends, so the tab stays open.</li>
+    <li><strong>Color</strong> of its chip in the menus: indigo, green, blue, yellow or gray.</li>
+    <li><strong>Shortcut</strong>, <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>1</kbd> to <kbd>9</kbd> (<kbd>Cmd</kbd> <kbd>Option</kbd> <kbd>1</kbd> to <kbd>9</kbd> on macOS).</li>
+</ul>
+<p>The default profile is the one a new tab opens. Profiles are saved in <code>settings.toml</code>; see <a href="settings.html#profiles">Settings</a>.</p>
+
+<h2>Opening a profile</h2>
+<ul>
+    <li>The arrow next to <strong>+</strong> lists every profile with its shortcut.</li>
+    <li><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>Space</kbd> opens a picker: the arrows move, <kbd>Enter</kbd> opens the tab, and each profile's number opens it directly.</li>
+    <li>A profile's own shortcut opens it directly.</li>
+</ul>
+
+<h2 id="shell-integration">Shell integration</h2>
+<p>bash, zsh and fish load Ghostty's shell integration scripts, with nothing to set up. The shell then reports its folder (OSC 7) and where each prompt starts (OSC 133). Programs see <code>TERM=xterm-ghostty</code>, <code>COLORTERM=truecolor</code> and <code>TERM_PROGRAM=tterm</code>. On Windows the WSL distributions run their own shells, which may not report their folder.</p>

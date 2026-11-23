@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Tanis Terminal, a fast native terminal</title>
+    <meta name="description" content="Tanis Terminal (tterm) is a fast, native terminal for Linux, Windows and macOS, built on Ghostty's terminal emulation. Tabs and profiles, screenshots ready for coding agents, and nothing running while idle.">
+    <meta name="author" content="Estanislao Pérez Nartallo">
+    <meta name="color-scheme" content="light dark">
+    <meta name="theme-color" content="#fcfcfd" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#15161a" media="(prefers-color-scheme: dark)">
+    <link rel="canonical" href="https://terminal.tanis.codes/">
+    <link rel="icon" href="favicon.ico" sizes="48x48">
+    <link rel="icon" href="img/logo.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="img/icon-512.png">
+    <link rel="manifest" href="site.webmanifest">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Tanis Terminal">
+    <meta property="og:locale" content="en_US">
+    <meta property="og:title" content="Tanis Terminal, a fast native terminal">
+    <meta property="og:description" content="Tanis Terminal (tterm) is a fast, native terminal for Linux, Windows and macOS, built on Ghostty's terminal emulation. Tabs and profiles, screenshots ready for coding agents, and nothing running while idle.">
+    <meta property="og:url" content="https://terminal.tanis.codes/">
+    <meta property="og:image" content="https://terminal.tanis.codes/img/og.png">
+    <meta property="og:image:type" content="image/png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="The Tanis Terminal window: three tabs in the title bar, a Git log and the output of cargo test.">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Tanis Terminal, a fast native terminal">
+    <meta name="twitter:description" content="Tanis Terminal (tterm) is a fast, native terminal for Linux, Windows and macOS, built on Ghostty's terminal emulation. Tabs and profiles, screenshots ready for coding agents, and nothing running while idle.">
+    <meta name="twitter:image" content="https://terminal.tanis.codes/img/og.png">
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Tanis Terminal",
+        "alternateName": "tterm",
+        "description": "A fast, native terminal emulator for Linux, Windows and macOS, built on libghostty-vt.",
+        "url": "https://terminal.tanis.codes/",
+        "downloadUrl": "https://terminal.tanis.codes/install.html",
+        "applicationCategory": "DeveloperApplication",
+        "operatingSystem": "Linux, Windows, macOS",
+        "image": "https://terminal.tanis.codes/img/og.png",
+        "screenshot": "https://terminal.tanis.codes/img/hero-light.webp",
+        "license": "https://www.apache.org/licenses/LICENSE-2.0",
+        "isAccessibleForFree": true,
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "author": { "@type": "Person", "name": "Estanislao Pérez Nartallo", "url": "https://tanis.codes" },
+        "sameAs": ["https://github.com/tanisperez/terminal"]
+    }
+    </script>
+    <link rel="preload" href="fonts/Geist-Regular.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="fonts/Geist-SemiBold.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="stylesheet" href="css/style.css">
+    <script src="js/theme.js"></script>
+</head>
+<body>
+    <a class="skip" href="#main">Skip to content</a>
+
+    <header class="site-header">
+        <div class="wrap">
+            <a class="brand" href="./">
+                <img src="img/logo.svg" alt="" width="28" height="28">
+                Tanis Terminal
+            </a>
+            <nav class="nav" aria-label="Main">
+                <a class="nav-wide" href="./#features">Features</a>
+                <a href="install.html">Download</a>
+                <a href="docs/">Docs</a>
+                <a class="nav-github" href="https://github.com/tanisperez/terminal" aria-label="Tanis Terminal on GitHub">
+                    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+                    <span>GitHub</span>
+                </a>
+                <button class="theme-toggle" type="button" aria-label="Dark theme" title="Switch between light and dark">
+                    <svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+                    <svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z"/></svg>
+                </button>
+            </nav>
+        </div>
+    </header>
+
+    <main id="main">
+        <section class="hero">
+            <div class="wrap">
+                <span class="eyebrow"><span class="pill">Open source</span> Free for everyone, Apache-2.0</span>
+                <h1>A fast terminal for the way you <span class="accent">work today</span></h1>
+                <p class="lead">Tanis Terminal is a native terminal for Linux, Windows and macOS. It runs on Ghostty's terminal emulation, draws on the GPU, keeps your shells in tabs and profiles, and hands screenshots to your coding agent with a paste.</p>
+                <div class="actions">
+                    <a class="btn btn-primary" href="install.html">Download Tanis Terminal</a>
+                    <a class="btn btn-secondary" href="https://github.com/tanisperez/terminal">
+                        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+                        View on GitHub
+                    </a>
+                </div>
+                <p class="platforms"><span data-version hidden><a href="https://github.com/tanisperez/terminal/releases/latest">Version …</a> · </span>For Linux, Windows and macOS</p>
+
+                <div class="hero-shot">
+                    <div class="shot">
+                        <img class="light" src="img/hero-light.webp" width="1800" height="1125" fetchpriority="high"
+                            alt="The Tanis Terminal window: three tabs in the title bar, a Git log and the output of cargo test.">
+                        <img class="dark" src="img/hero-dark.webp" width="1800" height="1125" fetchpriority="high"
+                            alt="The Tanis Terminal window: three tabs in the title bar, a Git log and the output of cargo test.">
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="highlights" aria-label="Highlights">
+            <div class="wrap">
+                <ul>
+                    <li><strong>Ghostty inside</strong><span>The terminal emulation is libghostty-vt, the parser and screen state of the Ghostty terminal.</span></li>
+                    <li><strong>Native and GPU drawn</strong><span>Written in Rust on gpui, the GPU accelerated UI framework of the Zed editor.</span></li>
+                    <li><strong>Idle means idle</strong><span>No timers and no polling: with nothing to show, Tanis Terminal uses no CPU and no GPU.</span></li>
+                    <li><strong>Yours to keep</strong><span>Open source under Apache-2.0. No account, no telemetry, settings in a plain text file.</span></li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="section" id="features">
+            <div class="wrap">
+                <div class="section-head">
+                    <span class="kicker">Features</span>
+                    <h2>Everything a terminal needs, and fast</h2>
+                    <p>Tabs in the title bar, a profile for each shell and project, links you can open, and the details that make full screen programs look right.</p>
+                </div>
+
+                <div class="features">
+                    <article class="feature">
+                        <div class="copy">
+                            <h3>Tabs and profiles</h3>
+                            <div class="text">
+                                <p>The shells of your machine are found for you: bash, zsh and fish, PowerShell and the Command Prompt, and every WSL distribution. Add your own profiles with a folder, a command to start with, a color and a shortcut.</p>
+                                <ul class="checks">
+                                    <li>A new tab with <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>T</kbd>, in the folder of the one you are in</li>
+                                    <li>Each profile on <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>1</kbd> to <kbd>9</kbd>, or picked from the keyboard</li>
+                                    <li>Drag tabs to reorder them, right click to close many at once</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="shot">
+                            <img class="light" src="img/profiles-light.webp" width="1800" height="1125" loading="lazy"
+                                alt="The profiles menu open under the tab bar: the detected shells and three profiles of the user, each with its shortcut.">
+                            <img class="dark" src="img/profiles-dark.webp" width="1800" height="1125" loading="lazy"
+                                alt="The profiles menu open under the tab bar: the detected shells and three profiles of the user, each with its shortcut.">
+                        </div>
+                    </article>
+
+                    <article class="feature">
+                        <div class="copy">
+                            <h3>Your coding agent's usage</h3>
+                            <div class="text">
+                                <p>See the tokens Claude Code used, per day and over a week, a month or three, with the models it used and the tabs where it runs now. The numbers are read from its logs on your machine; the content of your sessions is never read.</p>
+                                <ul class="checks">
+                                    <li>Input and output tokens, tasks and active time</li>
+                                    <li>A bar per day, cache tokens counted in</li>
+                                    <li>Nothing leaves your computer</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="shot">
+                            <img class="light" src="img/usage-light.webp" width="1800" height="1125" loading="lazy"
+                                alt="The agent usage screen: totals of input and output tokens, tasks and time for 30 days, a bar per day and the share of each model.">
+                            <img class="dark" src="img/usage-dark.webp" width="1800" height="1125" loading="lazy"
+                                alt="The agent usage screen: totals of input and output tokens, tasks and time for 30 days, a bar per day and the share of each model.">
+                        </div>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <section class="section section-alt" id="more">
+            <div class="wrap">
+                <div class="section-head">
+                    <span class="kicker">And more</span>
+                    <h2>The details that matter every day</h2>
+                </div>
+                <ul class="grid">
+                    <li class="card">
+                        <span class="badge">Ctrl V</span>
+                        <h3>Screenshots for your agent</h3>
+                        <p>Paste or drop a screenshot and it is saved as a PNG and its path typed at the prompt, ready for Claude Code to read.</p>
+                    </li>
+                    <li class="card">
+                        <span class="badge">Ctrl click</span>
+                        <h3>Links that open</h3>
+                        <p>Hold <kbd>Ctrl</kbd> to see a link underlined and click to open it, even a long one the terminal split in two lines.</p>
+                    </li>
+                    <li class="card">
+                        <span class="badge">Ctrl C</span>
+                        <h3>Copy and paste as you expect</h3>
+                        <p><kbd>Ctrl</kbd> <kbd>C</kbd> copies what you selected, or stops the program when nothing is selected. <kbd>Ctrl</kbd> <kbd>V</kbd> pastes.</p>
+                    </li>
+                    <li class="card">
+                        <span class="badge">OSC 7 133</span>
+                        <h3>Shell integration</h3>
+                        <p>bash, zsh and fish tell the terminal their folder and their prompts, with nothing to set up. A new tab starts where you are.</p>
+                    </li>
+                    <li class="card">
+                        <span class="badge">▛▜ ┌┐</span>
+                        <h3>Sharp boxes and blocks</h3>
+                        <p>Block and box drawing characters are drawn to fill their cells, so logos and the frames of btop or a TUI meet without gaps.</p>
+                    </li>
+                    <li class="card">
+                        <span class="badge">Ctrl +</span>
+                        <h3>Fonts that read well</h3>
+                        <p>Noto Sans Mono, JetBrains Mono, Cascadia Code and Fira Code come with it. Zoom with <kbd>Ctrl</kbd> <kbd>+</kbd> and <kbd>Ctrl</kbd> <kbd>-</kbd>.</p>
+                    </li>
+                    <li class="card">
+                        <span class="badge">EN ES</span>
+                        <h3>Settings that apply at once</h3>
+                        <p>Light, dark or your system's theme, the font, the cursor and the language. Every change shows at once and lands in a plain <code>settings.toml</code>.</p>
+                    </li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="cta">
+            <div class="wrap">
+                <div class="cta-box">
+                    <img src="img/logo.svg" alt="" width="64" height="64">
+                    <h2>Give Tanis Terminal a try</h2>
+                    <p>Free and open source, for Linux, Windows and macOS. No account needed, just download it and open a tab.</p>
+                    <div class="actions">
+                        <a class="btn btn-primary" href="install.html">Download Tanis Terminal</a>
+                        <a class="btn btn-secondary" href="docs/">Read the docs</a>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <div class="wrap">
+            <span>Tanis Terminal is open source under the Apache License 2.0.</span>
+            <nav aria-label="Footer">
+                <a href="https://github.com/tanisperez/terminal">GitHub</a>
+                <a href="https://github.com/tanisperez/terminal/releases">Releases</a>
+                <a href="https://github.com/tanisperez/terminal/issues">Report an issue</a>
+                <a href="https://tanis.codes">tanis.codes</a>
+            </nav>
+        </div>
+    </footer>
+</body>
+</html>

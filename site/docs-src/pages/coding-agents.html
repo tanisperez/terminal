@@ -1,0 +1,26 @@
+title: Coding agents
+description: How Tanis Terminal helps with coding agents such as Claude Code: screenshots pasted as file paths, profiles that start an agent, and the agent usage screen.
+---
+<h1>Coding agents</h1>
+<p class="lead">Coding agents such as Claude Code run in a terminal. Tanis Terminal makes the common steps short: show the agent a screenshot, start it in the right folder, and see how much it worked.</p>
+
+<h2 id="screenshots">Screenshots</h2>
+<p>Take a screenshot and press <kbd>Ctrl</kbd> <kbd>V</kbd> in a tab. Tanis Terminal saves the image as a PNG and types its path at the prompt, quoted for your shell, ready for the agent to read. Dropping an image file from your file manager types its path the same way; a box shows the image before you let go.</p>
+<p>Pasted images are kept in the cache folder of your system, never in Downloads, so a resumed session still finds them:</p>
+<ul>
+    <li><strong>Linux:</strong> <code>~/.cache/tterm/images/</code></li>
+    <li><strong>macOS:</strong> <code>~/Library/Caches/tterm/images/</code></li>
+    <li><strong>Windows:</strong> <code>%LOCALAPPDATA%\tterm\cache\images\</code></li>
+</ul>
+<p>Images older than 14 days are deleted when Tanis Terminal starts. Change the number of days with <code>pasted_images_days</code>, or turn the feature off in <a href="settings.html">Settings</a>.</p>
+
+<h2>A profile per project</h2>
+<p>A profile with a folder and a startup command opens a tab with the agent already running there, for example a profile named <code>claude · telaio</code> with the folder <code>~/dev/telaio</code> and the command <code>claude</code>. Give it a shortcut and it is one key away. See <a href="tabs-and-profiles.html#your-own-profiles">Your own profiles</a>.</p>
+
+<h2>Agent usage</h2>
+<p>The chart button in the bar opens the usage of Claude Code: input and output tokens, tasks and active time for the last 7, 30 or 90 days or all of them, a bar per day and the share of each model. On the left, the tabs where it runs now. <kbd>Esc</kbd> goes back to the terminal.</p>
+<ul>
+    <li>The numbers come from Claude Code's logs on your computer (<code>~/.claude/projects</code>). Only the usage figures are read, never the content of your sessions, and nothing is sent anywhere.</li>
+    <li>Input tokens include the ones read from and written to the cache; the tooltip of each bar breaks them down.</li>
+    <li>Other agents are not counted yet.</li>
+</ul>

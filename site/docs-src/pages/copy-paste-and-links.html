@@ -1,0 +1,34 @@
+title: Copy, paste and links
+description: Selecting text, copying and pasting with Ctrl+C and Ctrl+V, the right-click menu, and opening links with Ctrl+click in Tanis Terminal.
+---
+<h1>Copy, paste and links</h1>
+<p class="lead">Copy and paste work with the keys you use everywhere else, and links open with a click while you hold <kbd>Ctrl</kbd>. On macOS, <kbd>Cmd</kbd> takes the place of <kbd>Ctrl</kbd>.</p>
+
+<h2>Selecting</h2>
+<ul>
+    <li>Drag to select. A double click selects a word, a triple click a line.</li>
+    <li>On Linux the selection is also the primary selection: a middle click pastes it.</li>
+    <li>A program that uses the mouse (htop, vim with the mouse on) gets the clicks. Hold <kbd>Shift</kbd> to select anyway.</li>
+</ul>
+
+<h2>Copy and paste</h2>
+<ul>
+    <li><kbd>Ctrl</kbd> <kbd>C</kbd> copies the selection and clears it. With nothing selected, it is sent to the program, which usually stops it.</li>
+    <li><kbd>Ctrl</kbd> <kbd>V</kbd> pastes. Pasting several lines does not run them one by one: shells that support bracketed paste get the text as one block.</li>
+    <li><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>C</kbd>, <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>V</kbd> and <kbd>Shift</kbd> <kbd>Insert</kbd> also work.</li>
+</ul>
+<p>Because <kbd>Ctrl</kbd> <kbd>V</kbd> pastes, programs no longer receive it as a key (a shell's quoted insert, for example), as in kitty with the same setup.</p>
+
+<h2>The right-click menu</h2>
+<p>A right click on the terminal opens <strong>Copy</strong> and <strong>Paste</strong>. On a link it adds <strong>Open link</strong> and <strong>Copy link</strong>. A program that uses the mouse gets the right click instead.</p>
+
+<h2>Links</h2>
+<p>Hold <kbd>Ctrl</kbd> and move over a URL: it is underlined and the pointer becomes a hand. Click to open it in your default browser. This works in programs that use the mouse too.</p>
+<ul>
+    <li>Links start with <code>https://</code>, <code>http://</code>, <code>file://</code> or <code>ftp://</code>.</li>
+    <li>Punctuation that ends a sentence is left out, and so is a closing bracket without its opening one: in <code>(see https://example.com/a).</code> the link is <code>https://example.com/a</code>.</li>
+    <li>A long URL that reaches the right edge goes on in the next line, the way the terminal wrapped it.</li>
+</ul>
+
+<h2>Images and files</h2>
+<p>Pasting a screenshot saves it as a PNG and types its path, and dropping files types their paths. See <a href="coding-agents.html#screenshots">Coding agents</a>.</p>

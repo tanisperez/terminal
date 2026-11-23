@@ -1,0 +1,29 @@
+# Tanis Terminal
+
+> Tanis Terminal (tterm) is a fast, native, open source terminal for Linux, Windows and macOS. Its terminal emulation is libghostty-vt, the emulation of the Ghostty terminal; it runs shells in tabs and profiles, turns pasted screenshots into file paths for coding agents, shows the token usage of Claude Code, and does no work while idle. No account, no telemetry; the settings are a plain text file.
+
+Tanis Terminal is written in Rust on gpui, the GPU accelerated UI framework of the Zed editor.
+
+## Website
+
+- [Home](https://terminal.tanis.codes/): features and screenshots.
+- [Download](https://terminal.tanis.codes/install.html): the Windows installer and portable zip, the macOS disk image, and the Linux install script and tarball.
+
+## Documentation
+
+- [Introduction](https://terminal.tanis.codes/docs/): What Tanis Terminal is, what it does well, and where to start reading.
+- [Installation](https://terminal.tanis.codes/docs/installation.html): How to install Tanis Terminal on Windows, macOS and Linux, how it updates, and how to build it from source.
+- [Quick start](https://terminal.tanis.codes/docs/quick-start.html): The first five minutes with Tanis Terminal: tabs, profiles, copy and paste, links and the font size.
+- [Tabs and profiles](https://terminal.tanis.codes/docs/tabs-and-profiles.html): How tabs work in Tanis Terminal, which shells it finds, and how to add profiles with a folder, a startup command, a color and a shortcut.
+- [Copy, paste and links](https://terminal.tanis.codes/docs/copy-paste-and-links.html): Selecting text, copying and pasting with Ctrl+C and Ctrl+V, the right-click menu, and opening links with Ctrl+click in Tanis Terminal.
+- [Coding agents](https://terminal.tanis.codes/docs/coding-agents.html): How Tanis Terminal helps with coding agents such as Claude Code: screenshots pasted as file paths, profiles that start an agent, and the agent usage screen.
+- [Keyboard shortcuts](https://terminal.tanis.codes/docs/keyboard-shortcuts.html): Every keyboard shortcut of Tanis Terminal on Linux, Windows and macOS.
+- [Settings](https://terminal.tanis.codes/docs/settings.html): Every setting of Tanis Terminal, in the Settings window and in settings.toml, with where the file lives on each system.
+- [Command line](https://terminal.tanis.codes/docs/command-line.html): The tterm command: opening folders in tabs, the options, and the environment variables Tanis Terminal reads and sets.
+- [Troubleshooting](https://terminal.tanis.codes/docs/troubleshooting.html): Common problems with Tanis Terminal and how to solve them, and where its log file is.
+
+## Project
+
+- [Source code on GitHub](https://github.com/tanisperez/terminal): the README covers building from source.
+- [Releases](https://github.com/tanisperez/terminal/releases): every download, with SHA-256 checksums.
+- [Issues](https://github.com/tanisperez/terminal/issues): bug reports and feature requests.

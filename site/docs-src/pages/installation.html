@@ -1,0 +1,47 @@
+title: Installation
+description: How to install Tanis Terminal on Windows, macOS and Linux, how it updates, and how to build it from source.
+---
+<h1>Installation</h1>
+<p class="lead">Every release on <a href="https://github.com/tanisperez/terminal/releases/latest">GitHub</a> has files for Windows x86_64, macOS on Apple silicon and Linux x86_64. The <a href="../install.html">download page</a> links to them.</p>
+
+<h2>Windows</h2>
+<p>Run <code>tterm-X.Y.Z-windows-x86_64-setup.exe</code>. It installs Tanis Terminal for your user only, under <code>%LOCALAPPDATA%\Programs\tterm</code>, and needs no administrator rights. The installer offers three options:</p>
+<ul>
+    <li><strong>Add tterm to the PATH</strong>, checked: run <code>tterm</code> or <code>tterm C:\projects\app</code> from any new console. Uninstalling removes it again.</li>
+    <li><strong>Add "Open in Tanis Terminal" to the Explorer menu</strong>, checked: on folders and on the background of an open folder.</li>
+    <li><strong>Create a desktop shortcut</strong>, unchecked.</li>
+</ul>
+<p>To use it without installing anything, unzip <code>tterm-X.Y.Z-windows-x86_64-portable.zip</code> and run <code>tterm.exe</code>.</p>
+
+<h2>macOS</h2>
+<p>Open <code>tterm-X.Y.Z-macos-arm64.dmg</code> and drag Tanis Terminal to Applications. A Mac app cannot put itself on the PATH; to run <code>tterm</code> from another terminal, link it once:</p>
+```shell
+$ sudo ln -sf /Applications/tterm.app/Contents/MacOS/tterm /usr/local/bin/tterm
+```
+
+<h2>Linux</h2>
+
+<h3 id="install-script">Install script</h3>
+<p>On any distribution, one command installs the latest release for your user, with no sudo:</p>
+```shell
+$ curl -fsSL https://terminal.tanis.codes/install.sh | bash
+```
+<p>The script downloads the <a href="#tarball">tarball</a> of the latest release from GitHub, checks it against the release's <code>SHA256SUMS</code> and installs it under <code>~/.local</code>: the program in <code>~/.local/bin/tterm</code>, and the menu entry and the icons under <code>~/.local/share</code>. It keeps the list of the files it installed, so updating and uninstalling touch exactly those. If <code>~/.local/bin</code> is not on your <code>PATH</code>, it says so; the menu entry works either way.</p>
+<p>Options go after <code>bash -s --</code>:</p>
+```shell
+$ curl -fsSL https://terminal.tanis.codes/install.sh | bash -s -- --version 0.1.0
+$ curl -fsSL https://terminal.tanis.codes/install.sh | sudo bash -s -- --prefix /usr/local
+$ curl -fsSL https://terminal.tanis.codes/install.sh | bash -s -- --uninstall
+$ curl -fsSL https://terminal.tanis.codes/install.sh | bash -s -- --uninstall --purge
+```
+<p><code>--uninstall</code> keeps your settings and logs; <code>--purge</code> removes them too.</p>
+
+<h3 id="tarball">Tarball</h3>
+<p><code>tterm-X.Y.Z-linux-x86_64.tar.gz</code> holds <code>bin/tterm</code>, the desktop entry and the icons in a <code>/usr</code> like layout, and the install script. Unpack it anywhere and run <code>bin/tterm</code>, or run its <code>install.sh --tarball</code> to install it.</p>
+<p>Tanis Terminal needs a graphics driver with Vulkan, which every current distribution has. It runs on Wayland and on X11.</p>
+
+<h2 id="updates">Updates</h2>
+<p>Once after it starts, Tanis Terminal checks GitHub for a new version. On Windows, on macOS and in a Linux copy the install script put under your home, it downloads it in the background and checks it; then the bar shows <strong>X.Y.Z ready · Restart</strong>. Restarting closes every tab, so it always asks first. The portable zip and a tarball you unpacked by hand only tell you a new version exists. Turn the check off in <a href="settings.html">Settings</a>, About.</p>
+
+<h2>Building from source</h2>
+<p>Tanis Terminal builds with the stable Rust toolchain and Zig 0.17, which compiles libghostty-vt. Clone the repository and run <code>make release</code>; the binary is <code>target/release/tterm</code>. The <a href="https://github.com/tanisperez/terminal#building-from-source">README</a> lists the libraries Linux needs.</p>

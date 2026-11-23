@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Download Tanis Terminal</title>
+    <meta name="description" content="Download Tanis Terminal for Windows, macOS or Linux: the Windows installer or portable zip, the macOS disk image, or the Linux install script and tarball.">
+    <meta name="author" content="Estanislao Pérez Nartallo">
+    <meta name="color-scheme" content="light dark">
+    <meta name="theme-color" content="#fcfcfd" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#15161a" media="(prefers-color-scheme: dark)">
+    <link rel="canonical" href="https://terminal.tanis.codes/install.html">
+    <link rel="icon" href="favicon.ico" sizes="48x48">
+    <link rel="icon" href="img/logo.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="img/icon-512.png">
+    <link rel="manifest" href="site.webmanifest">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Tanis Terminal">
+    <meta property="og:locale" content="en_US">
+    <meta property="og:title" content="Download Tanis Terminal">
+    <meta property="og:description" content="Download Tanis Terminal for Windows, macOS or Linux: the Windows installer or portable zip, the macOS disk image, or the Linux install script and tarball.">
+    <meta property="og:url" content="https://terminal.tanis.codes/install.html">
+    <meta property="og:image" content="https://terminal.tanis.codes/img/og.png">
+    <meta property="og:image:type" content="image/png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="The Tanis Terminal window: three tabs in the title bar, a Git log and the output of cargo test.">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Download Tanis Terminal">
+    <meta name="twitter:description" content="Download Tanis Terminal for Windows, macOS or Linux: the Windows installer or portable zip, the macOS disk image, or the Linux install script and tarball.">
+    <meta name="twitter:image" content="https://terminal.tanis.codes/img/og.png">
+    <link rel="preload" href="fonts/Geist-Regular.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="fonts/Geist-SemiBold.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="stylesheet" href="css/style.css">
+    <script src="js/theme.js"></script>
+    <script src="js/copy.js" defer></script>
+</head>
+<body>
+    <a class="skip" href="#main">Skip to content</a>
+
+    <header class="site-header">
+        <div class="wrap">
+            <a class="brand" href="./">
+                <img src="img/logo.svg" alt="" width="28" height="28">
+                Tanis Terminal
+            </a>
+            <nav class="nav" aria-label="Main">
+                <a class="nav-wide" href="./#features">Features</a>
+                <a href="install.html">Download</a>
+                <a href="docs/">Docs</a>
+                <a class="nav-github" href="https://github.com/tanisperez/terminal" aria-label="Tanis Terminal on GitHub">
+                    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+                    <span>GitHub</span>
+                </a>
+                <button class="theme-toggle" type="button" aria-label="Dark theme" title="Switch between light and dark">
+                    <svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+                    <svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z"/></svg>
+                </button>
+            </nav>
+        </div>
+    </header>
+
+    <main id="main">
+        <section class="page-head">
+            <div class="wrap">
+                <h1>Download Tanis Terminal</h1>
+                <p>Free and open source. Pick your system below. Tanis Terminal updates itself when a new version comes out.</p>
+            </div>
+        </section>
+
+        <section aria-label="Downloads">
+            <div class="wrap">
+                <ul class="downloads">
+                    <li class="download">
+                        <h2>Windows</h2>
+                        <p>Windows 10 and 11, 64 bit. The installer is for your user only and needs no administrator rights. It adds Tanis Terminal to the Start menu, puts <code>tterm</code> on your PATH and adds <strong>Open in Tanis Terminal</strong> to the Explorer menu of folders. It updates itself. The portable zip needs no installer at all.</p>
+                        <a class="btn btn-primary" href="https://github.com/tanisperez/terminal/releases/latest" data-asset="tterm-…-windows-x86_64-setup.exe">Download the installer</a>
+                        <span class="alt">File <code data-file>tterm-…-windows-x86_64-setup.exe</code></span>
+                        <a class="btn btn-secondary" href="https://github.com/tanisperez/terminal/releases/latest" data-asset="tterm-…-windows-x86_64-portable.zip">Download the portable zip</a>
+                        <span class="alt">File <code data-file>tterm-…-windows-x86_64-portable.zip</code></span>
+                    </li>
+                    <li class="download">
+                        <h2>macOS</h2>
+                        <p>Apple silicon (M1 and later). Open the disk image and drag Tanis Terminal to Applications. It updates itself.</p>
+                        <a class="btn btn-primary" href="https://github.com/tanisperez/terminal/releases/latest" data-asset="tterm-…-macos-arm64.dmg">Download the disk image</a>
+                        <span class="alt">File <code data-file>tterm-…-macos-arm64.dmg</code></span>
+                    </li>
+                    <li class="download" id="linux">
+                        <h2>Linux</h2>
+                        <p>x86_64, any distribution. The <a href="#install-script">install script</a> below installs it for your user and keeps it up to date. Or download the tarball and unpack it where you like.</p>
+                        <a class="btn btn-primary" href="https://github.com/tanisperez/terminal/releases/latest" data-asset="tterm-…-linux-x86_64.tar.gz">Download the tarball</a>
+                        <span class="alt">File <code data-file>tterm-…-linux-x86_64.tar.gz</code></span>
+                    </li>
+                </ul>
+                <p class="release-line"><span data-version hidden><a href="https://github.com/tanisperez/terminal/releases/latest">Version …</a> · </span>Every file and its SHA-256 checksum are on the <a href="https://github.com/tanisperez/terminal/releases">releases page</a>.</p>
+            </div>
+        </section>
+
+        <section class="section" id="command-line">
+            <div class="wrap">
+                <div class="section-head">
+                    <span class="kicker">Command line</span>
+                    <h2>Install from a terminal</h2>
+                    <p>On Linux, one command installs Tanis Terminal and, run again, updates it.</p>
+                </div>
+
+                <div class="channels">
+                    <article class="channel" id="install-script">
+                        <h3>Any Linux distribution <small>install script</small></h3>
+                        <p>Installs Tanis Terminal for your user under <code>~/.local</code>, no sudo, with its launcher entry and icons. It then updates itself, or run the script again. <a href="docs/installation.html#install-script">Options and uninstall</a>.</p>
+                        <div class="code">
+<pre><span class="prompt">$ </span>curl -fsSL https://terminal.tanis.codes/install.sh | bash</pre>
+                        </div>
+                    </article>
+                    <article class="channel">
+                        <h3>macOS <small>terminal</small></h3>
+                        <p>A Mac app cannot put itself on the PATH. To run <code>tterm</code> from another terminal, link it once:</p>
+                        <div class="code">
+<pre><span class="prompt">$ </span>sudo ln -sf /Applications/tterm.app/Contents/MacOS/tterm /usr/local/bin/tterm</pre>
+                        </div>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <section class="section section-alt" id="first-launch">
+            <div class="wrap">
+                <div class="section-head">
+                    <span class="kicker">First launch</span>
+                    <h2>A note on unsigned builds</h2>
+                    <p>Tanis Terminal is not code signed yet, so your system asks once before opening it.</p>
+                </div>
+                <div class="channels">
+                    <article class="channel">
+                        <h3>macOS</h3>
+                        <p>If macOS says it cannot verify the developer, open System Settings, Privacy and Security, and choose <strong>Open Anyway</strong>. Or run this once:</p>
+                        <div class="code">
+<pre><span class="prompt">$ </span>xattr -dr com.apple.quarantine /Applications/tterm.app</pre>
+                        </div>
+                    </article>
+                    <article class="channel">
+                        <h3>Windows</h3>
+                        <p>If SmartScreen shows <strong>Windows protected your PC</strong>, choose <strong>More info</strong> and then <strong>Run anyway</strong>.</p>
+                    </article>
+                    <article class="channel">
+                        <h3>Build from source</h3>
+                        <p>Tanis Terminal builds with the stable Rust toolchain and Zig 0.17. Clone the repository and run <code>make release</code>. The <a href="https://github.com/tanisperez/terminal#building-from-source">README</a> lists the system libraries Linux needs.</p>
+                    </article>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <div class="wrap">
+            <span>Tanis Terminal is open source under the Apache License 2.0.</span>
+            <nav aria-label="Footer">
+                <a href="https://github.com/tanisperez/terminal">GitHub</a>
+                <a href="https://github.com/tanisperez/terminal/releases">Releases</a>
+                <a href="https://github.com/tanisperez/terminal/issues">Report an issue</a>
+                <a href="https://tanis.codes">tanis.codes</a>
+            </nav>
+        </div>
+    </footer>
+</body>
+</html>

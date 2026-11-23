@@ -1,0 +1,32 @@
+title: Command line
+description: The tterm command: opening folders in tabs, the options, and the environment variables Tanis Terminal reads and sets.
+---
+<h1>Command line</h1>
+<p class="lead">The installers put <code>tterm</code> on your PATH (on macOS, link it as shown in <a href="installation.html#macos">Installation</a>).</p>
+
+```shell
+$ tterm                      # one tab in your home folder
+$ tterm ~/dev/app ~/dev/api  # one tab in each folder
+$ tterm -- -odd-name         # after --, every argument is a folder
+```
+
+<h2>Options</h2>
+<table>
+    <thead><tr><th>Option</th><th>Meaning</th></tr></thead>
+    <tbody>
+        <tr><td><code>-h</code>, <code>--help</code></td><td>Print the help and exit.</td></tr>
+        <tr><td><code>-V</code>, <code>--version</code></td><td>Print the version and exit.</td></tr>
+    </tbody>
+</table>
+
+<h2>Environment variables</h2>
+<p>Tanis Terminal reads <code>TTERM_LOG</code>, the log level of one run (<code>off</code>, <code>error</code>, <code>warn</code>, <code>info</code>, <code>debug</code> or <code>trace</code>), over the one in Settings.</p>
+<p>It sets these for the programs in its tabs:</p>
+<table>
+    <thead><tr><th>Variable</th><th>Value</th></tr></thead>
+    <tbody>
+        <tr><td><code>TERM</code></td><td><code>xterm-ghostty</code>, with Ghostty's terminfo, which Tanis Terminal provides</td></tr>
+        <tr><td><code>COLORTERM</code></td><td><code>truecolor</code></td></tr>
+        <tr><td><code>TERM_PROGRAM</code></td><td><code>tterm</code></td></tr>
+    </tbody>
+</table>

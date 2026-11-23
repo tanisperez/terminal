@@ -1,0 +1,13 @@
+{
+    "name": "Tanis Terminal",
+    "short_name": "tterm",
+    "description": "A fast, native terminal for Linux, Windows and macOS.",
+    "start_url": "/",
+    "display": "browser",
+    "icons": [
+        { "src": "/img/icon-512.png", "sizes": "512x512", "type": "image/png" },
+        { "src": "/img/logo.svg", "sizes": "any", "type": "image/svg+xml" }
+    ],
+    "theme_color": "#5b63e6",
+    "background_color": "#0b0b0f"
+}

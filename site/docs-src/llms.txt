@@ -1,0 +1,20 @@
+# Tanis Terminal
+
+> Tanis Terminal (tterm) is a fast, native, open source terminal for Linux, Windows and macOS. Its terminal emulation is libghostty-vt, the emulation of the Ghostty terminal; it runs shells in tabs and profiles, turns pasted screenshots into file paths for coding agents, shows the token usage of Claude Code, and does no work while idle. No account, no telemetry; the settings are a plain text file.
+
+Tanis Terminal is written in Rust on gpui, the GPU accelerated UI framework of the Zed editor.
+
+## Website
+
+- [Home](https://terminal.tanis.codes/): features and screenshots.
+- [Download](https://terminal.tanis.codes/install.html): the Windows installer and portable zip, the macOS disk image, and the Linux install script and tarball.
+
+## Documentation
+
+$docs
+
+## Project
+
+- [Source code on GitHub](https://github.com/tanisperez/terminal): the README covers building from source.
+- [Releases](https://github.com/tanisperez/terminal/releases): every download, with SHA-256 checksums.
+- [Issues](https://github.com/tanisperez/terminal/issues): bug reports and feature requests.
