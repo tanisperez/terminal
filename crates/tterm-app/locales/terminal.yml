@@ -1,0 +1,14 @@
+# The right-click menu of a terminal.
+_version: 2
+"terminal.copy":
+  en: "Copy"
+  es: "Copiar"
+"terminal.paste":
+  en: "Paste"
+  es: "Pegar"
+"terminal.open_link":
+  en: "Open link"
+  es: "Abrir enlace"
+"terminal.copy_link":
+  en: "Copy link"
+  es: "Copiar enlace"

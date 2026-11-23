@@ -25,8 +25,11 @@ actions!(
         PreviousTab,
         /// Copies the selection (`Ctrl+Shift+C`, `Cmd+C`).
         Copy,
-        /// Pastes the clipboard into the terminal (`Ctrl+Shift+V`, `Cmd+V`).
+        /// Pastes the clipboard into the terminal (`Ctrl+Shift+V`, `Ctrl+V`, `Cmd+V`).
         Paste,
+        /// Copies the selection and clears it, or else sends Ctrl+C to the program (`Ctrl+C`),
+        /// as kitty's `copy_and_clear_or_interrupt`.
+        CopyOrInterrupt,
         /// Makes the terminal font one point bigger (`Ctrl+=`, `Cmd+=`).
         ZoomIn,
         /// Makes the terminal font one point smaller (`Ctrl+-`, `Cmd+-`).
@@ -138,5 +141,14 @@ pub fn bind_keys(cx: &mut App) {
         KeyBinding::new("ctrl--", ZoomOut, context),
         KeyBinding::new("ctrl-0", ZoomReset, context),
         KeyBinding::new("ctrl-,", OpenSettings, context),
+    ]);
+
+    // Ctrl+C copies when there is a selection and interrupts otherwise; Ctrl+V pastes, so
+    // programs no longer get a literal Ctrl+V (a shell's quoted insert), as in kitty with the
+    // same mapping. Bound last, so the menus show these keys.
+    #[cfg(not(target_os = "macos"))]
+    cx.bind_keys([
+        KeyBinding::new("ctrl-c", CopyOrInterrupt, terminal),
+        KeyBinding::new("ctrl-v", Paste, terminal),
     ]);
 }

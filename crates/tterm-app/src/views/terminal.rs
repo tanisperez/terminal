@@ -18,7 +18,7 @@ use tterm_term::{
     SelectionUnit,
 };
 
-use crate::actions::{Copy, Paste};
+use crate::actions::{Copy, CopyOrInterrupt, Paste};
 use crate::state::box_drawing;
 use crate::state::drop::{DropPreview, size_label};
 use crate::state::profiles::{Origin, Profile};
@@ -29,6 +29,8 @@ use crate::theme::metrics::{
 };
 use crate::theme::palette::rgb;
 use crate::theme::{PaletteExt as _, TerminalColors as _};
+use gpui_kit::component::menu::{ContextMenuExt as _, PopupMenu};
+use rust_i18n::t;
 
 /// Scrollback kept per terminal, Ghostty's default.
 const SCROLLBACK_BYTES: usize = 10_000_000;
@@ -117,6 +119,8 @@ pub struct TerminalView {
     /// The grid's place in the view (padding plus centering) and its size, for the resize
     /// overlay.
     grid_local: Bounds<Pixels>,
+    /// The size of the grid's area at the last layout, to tell a resize from a zoom.
+    grid_area: Size<Pixels>,
     /// The size shown while the window is resized (design C).
     resize: ResizeOverlay,
     /// Grows with every resize, so only the last one hides the size.
@@ -201,6 +205,7 @@ impl TerminalView {
             blink_hidden: false,
             _blink: Task::ready(()),
             grid_local: Bounds::default(),
+            grid_area: Size::default(),
             resize: ResizeOverlay::Hidden,
             resize_wait: 0,
             _resize: Task::ready(()),
@@ -626,6 +631,36 @@ impl TerminalView {
         }
     }
 
+    /// Ctrl+C: copies the selection and clears it, or sends the key to the program when nothing
+    /// is selected, encoded as any other key (an interrupt for most programs).
+    fn copy_or_interrupt(&mut self, _: &CopyOrInterrupt, _: &mut Window, cx: &mut Context<Self>) {
+        if let Ok(Some(text)) = self.emulator.selection_text() {
+            cx.write_to_clipboard(ClipboardItem::new_string(text));
+            if let Err(error) = self.emulator.clear_selection() {
+                log::debug!("selection not cleared: {error}");
+            }
+            self.refresh_frame();
+            cx.notify();
+            return;
+        }
+        let input = KeyInput {
+            key: "c".to_string(),
+            text: None,
+            mods: Modifiers {
+                ctrl: true,
+                ..Modifiers::default()
+            },
+            repeat: false,
+        };
+        let bytes = self.emulator.encode_key(&input);
+        self.send_input(&bytes, cx);
+    }
+
+    /// Whether some text is selected, for the Copy item of the menu.
+    fn has_selection(&self) -> bool {
+        matches!(self.emulator.selection_text(), Ok(Some(_)))
+    }
+
     /// Saves a clipboard image and types its quoted path, as design E shows.
     fn paste_image(
         &mut self,
@@ -868,11 +903,12 @@ impl TerminalView {
             },
         );
         let previous = self.emulator.size();
+        let area = std::mem::replace(&mut self.grid_area, bounds.size);
         if size == previous {
             return;
         }
-        // The first layout is not a resize.
-        if previous != GridSize::default() {
+        // Only the window's size shows it: not the first layout, nor a zoom of the font.
+        if previous != GridSize::default() && area != bounds.size {
             self.show_resize(cx);
         }
         if let Err(error) = self.emulator.resize(size) {
@@ -931,7 +967,21 @@ impl Render for TerminalView {
             .drop_preview
             .as_ref()
             .map(|preview| drop_overlay(preview, &palette));
-        div()
+        // A program that tracks the mouse gets the right button; otherwise it opens the menu.
+        let menu = (!self.emulator.mouse_tracking()).then(|| {
+            let focus = self.focus.clone();
+            let has_selection = self.has_selection();
+            move |menu: PopupMenu, _: &mut Window, _: &mut Context<PopupMenu>| {
+                menu.action_context(focus.clone())
+                    .menu_with_disabled(
+                        t!("terminal.copy"),
+                        Box::new(CopyOrInterrupt),
+                        !has_selection,
+                    )
+                    .menu(t!("terminal.paste"), Box::new(Paste))
+            }
+        });
+        let terminal = div()
             .id("terminal")
             .key_context(crate::actions::TERMINAL_CONTEXT)
             .track_focus(&self.focus)
@@ -973,6 +1023,7 @@ impl Render for TerminalView {
                 cx.listener(|view, event, _, cx| view.on_button_up(event, cx)),
             )
             .on_action(cx.listener(Self::paste))
+            .on_action(cx.listener(Self::copy_or_interrupt))
             .on_action(cx.listener(Self::copy))
             .on_drop(cx.listener(|view, paths: &ExternalPaths, _, cx| {
                 view.drop_preview = None;
@@ -1005,7 +1056,11 @@ impl Render for TerminalView {
                 .size_full(),
             )
             .children(overlay)
-            .children(resize)
+            .children(resize);
+        match menu {
+            Some(menu) => terminal.context_menu(menu).into_any_element(),
+            None => terminal.into_any_element(),
+        }
     }
 }
 
