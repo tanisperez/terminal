@@ -2,15 +2,18 @@
 //!
 //! The bar always shows, with one tab too (A4): the new tab button and the profiles are at hand
 //! and nothing moves when the second tab opens. A single tab has no close button (A1, A4, U).
+//! Tabs reorder by dragging and have telaio's Close items on a right click, as Postino and ted.
 
 use std::path::PathBuf;
 
 use gpui_kit::assets::IconName;
+use gpui_kit::component::menu::{ContextMenuExt as _, PopupMenu};
 use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::*;
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 use rust_i18n::t;
+use telaio_ui::components::{CloseScope, TabMenuTarget, close_item};
 
 use crate::actions::{
     CONTEXT, CloseTab, NewTab, NextTab, OpenProfile, OpenProfilePicker, OpenSettings, OpenUsage,
@@ -192,6 +195,25 @@ impl AppView {
         cx.notify();
     }
 
+    /// Closes the tabs a Close item of the tab menu names, the last first so the indices hold.
+    fn close_scope(
+        &mut self,
+        index: usize,
+        scope: CloseScope,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        for at in self.tabs.close_targets(index, scope).into_iter().rev() {
+            self.close_tab_at(at, window, cx);
+        }
+    }
+
+    /// Moves a dragged tab onto the place of another (`usize::MAX`: the end of the bar).
+    fn move_tab(&mut self, from: usize, to: usize, cx: &mut Context<Self>) {
+        self.tabs.move_tab(from, to);
+        cx.notify();
+    }
+
     fn activate(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
         if self.tabs.activate(index) {
             self.focus_active(window, cx);
@@ -361,10 +383,15 @@ impl AppView {
         // Tabs shrink to their minimum; past it the strip clips them and the buttons of the
         // bar stay in place.
         let mut strip = h_flex()
+            .id("tab-strip")
             .items_start()
             .min_w_0()
             .flex_shrink(1.0)
-            .overflow_hidden();
+            .overflow_hidden()
+            // Dropped on the bar past the last tab: the tab moves to the end.
+            .on_drop(cx.listener(|view, dragged: &DraggedTab, _, cx| {
+                view.move_tab(dragged.index, usize::MAX, cx)
+            }));
         for (index, tab) in self.tabs.iter().enumerate() {
             let active = index == self.tabs.active_index();
             let label = tab.read(cx).label();
@@ -461,6 +488,12 @@ impl AppView {
                 view.close_tab_at(index, window, cx);
             }))
             .child(Icon::new(IconName::X).with_size(px(12.0)));
+        let accent = palette.accent;
+        let dragged = DraggedTab {
+            index,
+            label: label.clone().into(),
+        };
+        let menu_view = cx.weak_entity();
         h_flex()
             .id(("tab", index))
             .group(group)
@@ -530,7 +563,85 @@ impl AppView {
                     .child(label),
             )
             .when(closable, |tab| tab.child(close))
+            // Dragging reorders: the accent line marks the side the dragged tab lands on, as
+            // telaio's document tabs.
+            .on_drag(dragged, |dragged, _, _, cx| cx.new(|_| dragged.clone()))
+            .drag_over::<DraggedTab>(move |style, dragged, _, _| {
+                if dragged.index > index {
+                    style.border_l_2().border_color(accent)
+                } else if dragged.index < index {
+                    style.border_r_2().border_color(accent)
+                } else {
+                    style
+                }
+            })
+            .on_drop(cx.listener(move |view, dragged: &DraggedTab, _, cx| {
+                view.move_tab(dragged.index, index, cx)
+            }))
+            .context_menu(move |menu, _, cx| tab_menu(menu, index, &menu_view, cx))
     }
+}
+
+/// The value carried while a tab is dragged, also its preview under the pointer.
+#[derive(Clone)]
+struct DraggedTab {
+    index: usize,
+    label: SharedString,
+}
+
+impl Render for DraggedTab {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let palette = cx.palette();
+        h_flex()
+            .h(px(TAB_BAR_HEIGHT - 6.0))
+            .items_center()
+            .gap(px(8.0))
+            .px(px(12.0))
+            .rounded(px(RADIUS_SM))
+            .border_1()
+            .border_color(palette.border_strong)
+            .bg(palette.terminal_bg())
+            .shadow(palette.shadow.clone())
+            .opacity(0.9)
+            .text_size(px(12.5))
+            .text_color(palette.fg)
+            .child(
+                Icon::new(IconName::Terminal)
+                    .with_size(px(TAB_ICON_SIZE))
+                    .text_color(palette.accent_text),
+            )
+            .child(self.label.clone())
+    }
+}
+
+/// The right-click menu of a tab, telaio's Close items as Postino's and ted's: Close, Close
+/// others, to the right, to the left and all. Closing the last tab closes the window.
+fn tab_menu(menu: PopupMenu, index: usize, view: &WeakEntity<AppView>, cx: &App) -> PopupMenu {
+    let count = view
+        .upgrade()
+        .map_or(0, |view| view.read(cx).tabs.iter().count());
+    // Terminals have no unsaved state: the Close saved item of documents does not apply.
+    let target = TabMenuTarget::new(index, &vec![false; count]);
+    [
+        CloseScope::This,
+        CloseScope::Others,
+        CloseScope::Right,
+        CloseScope::Left,
+        CloseScope::All,
+    ]
+    .into_iter()
+    .fold(menu, |menu, scope| {
+        let view = view.clone();
+        let action: Option<&dyn Action> = (scope == CloseScope::This).then_some(&CloseTab);
+        menu.item(close_item(
+            scope,
+            target.applies(scope),
+            action,
+            move |window, cx| {
+                let _ = view.update(cx, |view, cx| view.close_scope(index, scope, window, cx));
+            },
+        ))
+    })
 }
 
 /// A 28 px icon button of the bar.

@@ -94,6 +94,40 @@ impl<T> Tabs<T> {
         }
     }
 
+    /// Moves the tab at `from` to the place of the tab at `to` (past the end: to the end), as
+    /// dragging it onto that tab does. The active tab stays the same one.
+    pub fn move_tab(&mut self, from: usize, to: usize) {
+        if from >= self.tabs.len() {
+            return;
+        }
+        let to = to.min(self.tabs.len() - 1);
+        if from == to {
+            return;
+        }
+        let active = self.active;
+        let tab = self.tabs.remove(from);
+        self.tabs.insert(to, tab);
+        self.active = if active == from {
+            to
+        } else if from < active && active <= to {
+            active - 1
+        } else if to <= active && active < from {
+            active + 1
+        } else {
+            active
+        };
+    }
+
+    /// The indices of the tabs a Close item of the tab menu closes, in order (telaio's
+    /// [`telaio_ui::components::close_targets`], with no unsaved tabs).
+    pub fn close_targets(
+        &self,
+        index: usize,
+        scope: telaio_ui::components::CloseScope,
+    ) -> Vec<usize> {
+        telaio_ui::components::close_targets(&vec![false; self.tabs.len()], index, scope)
+    }
+
     /// The index of the first tab that matches.
     pub fn position(&self, matches: impl Fn(&T) -> bool) -> Option<usize> {
         self.tabs.iter().position(matches)
@@ -188,6 +222,34 @@ mod tests {
         list.open("d");
         assert_eq!(names(&list), vec!["a", "d", "b", "c"]);
         assert_eq!(list.active(), Some(&"d"));
+    }
+
+    #[test]
+    fn moving_a_tab_keeps_the_active_one() {
+        let mut list = tabs(&["a", "b", "c", "d"]);
+        list.activate(1);
+        list.move_tab(0, 2);
+        assert_eq!(names(&list), vec!["b", "c", "a", "d"]);
+        assert_eq!(list.active(), Some(&"b"));
+        list.move_tab(3, 0);
+        assert_eq!(names(&list), vec!["d", "b", "c", "a"]);
+        assert_eq!(list.active(), Some(&"b"));
+        // The dragged tab is the active one; past the end means the end.
+        list.move_tab(1, usize::MAX);
+        assert_eq!(names(&list), vec!["d", "c", "a", "b"]);
+        assert_eq!(list.active(), Some(&"b"));
+        list.move_tab(9, 0);
+        assert_eq!(names(&list), vec!["d", "c", "a", "b"]);
+    }
+
+    #[test]
+    fn the_close_items_name_their_tabs() {
+        use telaio_ui::components::CloseScope;
+        let list = tabs(&["a", "b", "c"]);
+        assert_eq!(list.close_targets(1, CloseScope::Others), vec![0, 2]);
+        assert_eq!(list.close_targets(1, CloseScope::Right), vec![2]);
+        assert_eq!(list.close_targets(1, CloseScope::Left), vec![0]);
+        assert_eq!(list.close_targets(1, CloseScope::All), vec![0, 1, 2]);
     }
 
     #[test]
