@@ -1,0 +1,80 @@
+# The in-app updater (design R).
+_version: 2
+"update.setting.title":
+  en: "Updates"
+  es: "Actualizaciones"
+"update.setting.check":
+  en: "Check for updates automatically"
+  es: "Buscar actualizaciones automáticamente"
+"update.setting.check_description":
+  en: "Once, a few seconds after launch. Never polls in the background."
+  es: "Una vez, unos segundos después de abrir. Nunca en segundo plano."
+"update.setting.check_for_updates":
+  en: "Check for updates"
+  es: "Buscar actualizaciones"
+"update.setting.check_now":
+  en: "Check now"
+  es: "Buscar ahora"
+"update.bar.ready":
+  en: "%{version} ready · Restart"
+  es: "%{version} lista · Reiniciar"
+"update.bar.ready_tooltip":
+  en: "Update downloaded and verified, restart to install it"
+  es: "Actualización descargada y verificada, reinicia para instalarla"
+"update.bar.available":
+  en: "%{version} available"
+  es: "%{version} disponible"
+"update.bar.download_tooltip":
+  en: "Open the release page to download it"
+  es: "Abrir la página de la versión para descargarla"
+"update.bar.script_tooltip":
+  en: "Copy the install command, which updates it"
+  es: "Copiar el comando de instalación, que la actualiza"
+"update.checking":
+  en: "Checking for updates..."
+  es: "Buscando actualizaciones..."
+"update.up_to_date":
+  en: "Tanis Terminal %{version} is the latest version"
+  es: "Tanis Terminal %{version} es la última versión"
+"update.found":
+  en: "Update %{version} downloaded, restart from the tab bar to install it"
+  es: "Actualización %{version} descargada, reinicia desde la barra de pestañas para instalarla"
+"update.already_ready":
+  en: "Update %{version} is ready, restart from the tab bar to install it"
+  es: "La actualización %{version} está lista, reinicia desde la barra de pestañas para instalarla"
+"update.available_manual":
+  en: "Update %{version} is available, download the new zip from the release page"
+  es: "La actualización %{version} está disponible, descarga el nuevo zip de la página de la versión"
+"update.available_linux":
+  en: "Update %{version} is available, download it from the release page"
+  es: "La actualización %{version} está disponible, descárgala de la página de la versión"
+"update.available_script":
+  en: "Update %{version} is available, run the install command again to update"
+  es: "La actualización %{version} está disponible, vuelve a ejecutar el comando de instalación"
+"update.command_copied":
+  en: "Command copied. Close Tanis Terminal and run it in another terminal to update: %{command}"
+  es: "Comando copiado. Cierra Tanis Terminal y ejecútalo en otra terminal para actualizar: %{command}"
+"update.check_failed":
+  en: "Could not check for updates: %{error}"
+  es: "No se pudo buscar actualizaciones: %{error}"
+"update.install_failed":
+  en: "Could not install the update: %{error}"
+  es: "No se pudo instalar la actualización: %{error}"
+"update.fallback":
+  en: "Could not update in place, download the new version from GitHub"
+  es: "No se pudo actualizar aquí, descarga la nueva versión de GitHub"
+"update.unavailable":
+  en: "This copy of Tanis Terminal does not update itself"
+  es: "Esta copia de Tanis Terminal no se actualiza sola"
+"update.confirm.title":
+  en: "Restart to update to %{version}?"
+  es: "¿Reiniciar para actualizar a %{version}?"
+"update.confirm.text":
+  en: "This closes the %{count} open tabs and the programs running in them. Tanis Terminal opens again with the new version."
+  es: "Se cierran las %{count} pestañas abiertas y los programas que corren en ellas. Tanis Terminal se abre de nuevo con la versión nueva."
+"update.confirm.text_one":
+  en: "This closes the open tab and the programs running in it. Tanis Terminal opens again with the new version."
+  es: "Se cierra la pestaña abierta y los programas que corren en ella. Tanis Terminal se abre de nuevo con la versión nueva."
+"update.confirm.restart":
+  en: "Restart"
+  es: "Reiniciar"

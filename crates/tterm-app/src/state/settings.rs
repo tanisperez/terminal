@@ -2,7 +2,7 @@
 //! copy and Save applies it, as in the design (F); the file is written at once.
 //!
 //! Only what 0.1.0 needs: language, theme, the terminal font and its size, the cursor shape,
-//! pasting images and the log level. Each feature adds its own settings as it lands.
+//! pasting images, the log level and the update check. Each feature adds its own settings as it lands.
 
 use std::fs;
 use std::ops::RangeInclusive;
@@ -128,6 +128,9 @@ pub struct Settings {
     pub pasted_images_days: u32,
     /// How much is written to the log file.
     pub log_level: LogLevel,
+    /// Whether the in-app updater checks once after startup. Only builds with the updater
+    /// (`state/update.rs`) read it.
+    pub check_updates: bool,
     /// The name of the profile a new tab opens; the first one when absent or unknown.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default_profile: Option<String>,
@@ -148,6 +151,7 @@ impl Default for Settings {
             paste_images: true,
             pasted_images_days: 14,
             log_level: LogLevel::default(),
+            check_updates: true,
             default_profile: None,
             hidden_profiles: Vec::new(),
             profiles: Vec::new(),
@@ -264,6 +268,9 @@ fn parse_settings(content: &str) -> Settings {
     if let Some(value) = text("log_level").and_then(LogLevel::parse) {
         settings.log_level = value;
     }
+    if let Some(value) = table.get("check_updates").and_then(toml::Value::as_bool) {
+        settings.check_updates = value;
+    }
     settings
 }
 
@@ -323,6 +330,7 @@ mod tests {
             paste_images: false,
             pasted_images_days: 30,
             log_level: LogLevel::Debug,
+            check_updates: false,
             default_profile: Some("claude · telaio".to_string()),
             hidden_profiles: vec!["fish".to_string()],
             profiles: vec![

@@ -17,6 +17,8 @@ gpui-kit = "0.10.0"
 telaio-ui = { git = "https://github.com/tanisperez/telaio", tag = "v0.32.0" }
 # The application shell: logging, command line pieces, language, numbers, paths, window bootstrap.
 telaio-app = { git = "https://github.com/tanisperez/telaio", tag = "v0.32.0" }
+# The in-app updater shared with Postino and ted: checks, downloads and installs releases.
+telaio-update = { git = "https://github.com/tanisperez/telaio", tag = "v0.32.0" }
 # Terminal emulation: libghostty-vt, Ghostty's VT parser and screen state, linked statically. On
 # Linux and Windows MSVC it is built from source with Zig 0.17.
 ghostty-vt = "0.9.0"

@@ -8,4 +8,5 @@ pub mod profiles;
 pub mod settings;
 pub mod shell;
 pub mod tabs;
+pub mod update;
 pub mod window;

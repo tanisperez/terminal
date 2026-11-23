@@ -10,9 +10,9 @@ use gpui_kit::prelude::*;
 use gpui_kit::*;
 use rust_i18n::t;
 use telaio_ui::components::{
-    LabeledRow, NumberStepper, OpenOnClickExt as _, SectionHeading, SegmentedControl,
-    SegmentedItem, SettingsCategory, SettingsLayout, menu_choice_item, select_label_row,
-    select_trigger, settings_dialog, switch_halo,
+    LabeledRow, NumberStepper, OpenOnClickExt as _, SecondaryButton, SectionHeading,
+    SegmentedControl, SegmentedItem, SettingsCategory, SettingsLayout, menu_choice_item,
+    select_label_row, select_trigger, settings_dialog, switch_halo,
 };
 
 use crate::state::locale::{LANGUAGES, LanguageChoice};
@@ -129,7 +129,17 @@ fn render(weak: WeakEntity<AppView>, fonts: &[String], cx: &mut App) -> AnyEleme
             language_section(weak.clone(), settings.language),
         ],
         Category::Profiles => vec![super::settings_profiles::profiles_section(weak.clone(), cx)],
-        Category::About => vec![about_section(&palette, &mono_font)],
+        Category::About => {
+            let mut sections = vec![about_section(&palette, &mono_font)];
+            if crate::state::update::updater_enabled() {
+                sections.push(updates_section(
+                    weak.clone(),
+                    settings.check_updates,
+                    &palette,
+                ));
+            }
+            sections
+        }
     };
     let path = settings_path()
         .map(|path| path.display().to_string())
@@ -382,10 +392,46 @@ fn about_section(palette: &Palette, mono_font: &SharedString) -> AnyElement {
                 .text_color(palette.fg_muted)
                 .child(format!("libghostty-vt {}", tterm_term::ghostty_version())),
         ))
+        .child(div().text_color(palette.fg_muted).child(
+            if crate::state::update::updater_enabled() {
+                t!("settings.about.privacy_updater")
+            } else {
+                t!("settings.about.privacy")
+            },
+        ))
+        .into_any_element()
+}
+
+/// The Updates section of About (design R): the check after startup and a check now. Only in a
+/// copy that has the in-app updater.
+fn updates_section(weak: WeakEntity<AppView>, check: bool, palette: &Palette) -> AnyElement {
+    let toggle = switch_halo(
+        "settings-check-updates-halo",
+        Switch::new("settings-check-updates")
+            .checked(check)
+            .on_click({
+                let weak = weak.clone();
+                move |checked, window, cx| {
+                    let checked = *checked;
+                    update(&weak, window, cx, |settings| {
+                        settings.check_updates = checked
+                    })
+                }
+            }),
+        palette,
+    );
+    let now = SecondaryButton::new("settings-check-updates-now", t!("update.setting.check_now"))
+        .icon(Icon::new(IconName::RefreshCw))
+        .on_click(move |_, window, cx| {
+            let _ = weak.update(cx, |view, cx| view.check_for_updates_manually(window, cx));
+        });
+    v_flex()
+        .gap(px(14.0))
+        .child(SectionHeading::new(t!("update.setting.title")))
         .child(
-            div()
-                .text_color(palette.fg_muted)
-                .child(t!("settings.about.privacy")),
+            LabeledRow::new(t!("update.setting.check"), toggle)
+                .description(t!("update.setting.check_description")),
         )
+        .child(LabeledRow::new(t!("update.setting.check_for_updates"), now))
         .into_any_element()
 }

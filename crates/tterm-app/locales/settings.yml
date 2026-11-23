@@ -72,6 +72,9 @@ _version: 2
 "settings.about.privacy":
   en: "Tanis Terminal connects to nothing on its own."
   es: "Tanis Terminal no se conecta a nada por su cuenta."
+"settings.about.privacy_updater":
+  en: "On its own, Tanis Terminal only connects to GitHub to check for updates."
+  es: "Por su cuenta, Tanis Terminal solo se conecta a GitHub para buscar actualizaciones."
 "settings.category.profiles":
   en: "Profiles"
   es: "Perfiles"

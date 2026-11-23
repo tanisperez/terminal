@@ -20,6 +20,7 @@ log = { workspace = true }
 rust-i18n = { workspace = true }
 telaio-ui = { workspace = true }
 telaio-app = { workspace = true }
+telaio-update = { workspace = true }
 tterm-cli = { path = "../tterm-cli" }
 tterm-term = { path = "../tterm-term" }
 tterm-usage = { path = "../tterm-usage" }

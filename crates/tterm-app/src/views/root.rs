@@ -52,6 +52,10 @@ pub struct AppView {
     usage: Option<(Entity<UsageView>, Subscription)>,
     /// The category the Settings dialog shows.
     pub(crate) settings_category: super::settings::Category,
+    /// The in-app updater: idle, checking, or an update ready (`state/update.rs`).
+    pub(crate) update: crate::state::update::UpdateState,
+    /// How this copy was installed, as far as updates care. Read once at startup.
+    pub(crate) update_env: crate::state::update::UpdateEnv,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -78,6 +82,8 @@ impl AppView {
             settings_category: super::settings::Category::default(),
             usage: None,
             picker: None,
+            update: crate::state::update::UpdateState::default(),
+            update_env: crate::state::update::UpdateEnv::detect(),
             _subscriptions: Vec::new(),
         };
         view.rebuild_profiles();
@@ -95,6 +101,7 @@ impl AppView {
         }
         view.tabs.activate(0);
         view.focus_active(window, cx);
+        view.schedule_startup_update_check(cx);
         // Debug hooks (AGENTS.md): start on the usage screen, or with Settings open on a page.
         if std::env::var("TTERM_OPEN").is_ok_and(|open| open.trim() == "usage") {
             view.open_usage(&OpenUsage, window, cx);
@@ -339,6 +346,11 @@ impl AppView {
         cx.notify();
     }
 
+    /// How many tabs are open.
+    pub(crate) fn tab_count(&self) -> usize {
+        self.tabs.iter().count()
+    }
+
     /// Whether the window follows the system theme, for `follow_system_appearance`.
     pub(crate) fn follows_system_theme(&self) -> bool {
         self.settings.theme == ThemeChoice::System
@@ -382,8 +394,11 @@ impl AppView {
                 )));
             }
         }
+        row = row.child(div().flex_1());
+        if let Some(update) = self.render_update_button(palette, cx) {
+            row = row.child(no_drag(div().mt(px(4.0)).mr(px(6.0)).child(update)));
+        }
         row = row
-            .child(div().flex_1())
             .child(no_drag(
                 bar_button("agent-usage", IconName::ChartNoAxesColumn, palette)
                     .mt(px(4.0))

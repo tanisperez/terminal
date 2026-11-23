@@ -6,6 +6,7 @@ mod root;
 mod settings;
 mod settings_profiles;
 mod terminal;
+mod update;
 mod usage;
 
 pub use root::AppView;
