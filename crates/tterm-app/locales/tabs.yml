@@ -1,0 +1,11 @@
+# The tab bar and its buttons.
+_version: 2
+"tabs.new":
+  en: "New tab"
+  es: "Nueva pestaña"
+"tabs.close":
+  en: "Close tab"
+  es: "Cerrar pestaña"
+"usage.open":
+  en: "Agent usage"
+  es: "Uso de agentes"

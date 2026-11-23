@@ -1,0 +1,20 @@
+[package]
+name = "tterm-term"
+description = "The terminal of Tanis Terminal without a window: the pseudo terminal the shell runs in and the libghostty-vt emulator, turned into plain frames to paint."
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+ghostty-vt = { workspace = true }
+portable-pty = { workspace = true }
+thiserror = { workspace = true }
+log = { workspace = true }
+
+[dev-dependencies]
+pretty_assertions = { workspace = true }
+
+[lints]
+workspace = true

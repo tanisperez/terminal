@@ -1,0 +1,74 @@
+# The Settings dialog.
+_version: 2
+"settings.title":
+  en: "Settings"
+  es: "Configuración"
+"settings.open":
+  en: "Settings"
+  es: "Configuración"
+"settings.saved_to":
+  en: "Saved to"
+  es: "Guardado en"
+"settings.applied":
+  en: "Changes apply at once."
+  es: "Los cambios se aplican al momento."
+"settings.category.general":
+  en: "General"
+  es: "General"
+"settings.category.about":
+  en: "About"
+  es: "Acerca de"
+"settings.appearance":
+  en: "Appearance"
+  es: "Apariencia"
+"settings.theme.label":
+  en: "Theme"
+  es: "Tema"
+"settings.theme.dark":
+  en: "Dark"
+  es: "Oscuro"
+"settings.theme.light":
+  en: "Light"
+  es: "Claro"
+"settings.theme.system":
+  en: "System"
+  es: "Sistema"
+"settings.font":
+  en: "Font"
+  es: "Fuente"
+"settings.cursor.label":
+  en: "Cursor"
+  es: "Cursor"
+"settings.cursor.block":
+  en: "Block"
+  es: "Bloque"
+"settings.cursor.bar":
+  en: "Bar"
+  es: "Barra"
+"settings.cursor.underline":
+  en: "Underline"
+  es: "Subrayado"
+"settings.input":
+  en: "Input"
+  es: "Entrada"
+"settings.paste_images.label":
+  en: "Paste images and files"
+  es: "Pegar imágenes y archivos"
+"settings.paste_images.description":
+  en: "Clipboard screenshots are saved as PNG and their path is pasted."
+  es: "Las capturas del portapapeles se guardan como PNG y se pega su ruta."
+"settings.language.title":
+  en: "Language"
+  es: "Idioma"
+"settings.language.label":
+  en: "Interface language"
+  es: "Idioma de la interfaz"
+"settings.language.auto":
+  en: "System"
+  es: "Sistema"
+"settings.about.engine":
+  en: "Terminal engine"
+  es: "Motor de terminal"
+"settings.about.privacy":
+  en: "Tanis Terminal connects to nothing on its own."
+  es: "Tanis Terminal no se conecta a nada por su cuenta."
