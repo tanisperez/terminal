@@ -1,0 +1,4 @@
+// Windows resources for tterm.exe. gpui loads the window and taskbar icon from the icon resource
+// with ID 1, and Explorer shows it as the file icon. tterm.ico is packaging/icons/tterm.svg at
+// 16 to 256 px.
+1 ICON "tterm.ico"

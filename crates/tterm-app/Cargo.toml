@@ -25,6 +25,10 @@ tterm-term = { path = "../tterm-term" }
 tterm-usage = { path = "../tterm-usage" }
 chrono = { workspace = true }
 
+# The Windows resources, compiled when the target is Windows (build.rs), from any host.
+[build-dependencies]
+embed-resource = "3"
+
 [dev-dependencies]
 tempfile = { workspace = true }
 pretty_assertions = { workspace = true }

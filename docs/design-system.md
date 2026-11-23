@@ -75,7 +75,10 @@ bright black `#8b8e9a`. Programs may change them for a while (OSC 4, 10, 11, 12)
   Enter, a number, Esc, and the hints bar of telaio's modals.
 - Tab labels: a user's profile is named by the profile; others by the program's title (a
   title that is a program path is ignored), or the shell and its folder.
-- Still to build: D (the drop overlay), G (the icon).
+- **G, icon**: `packaging/icons/tterm.svg`, the black square with the indigo prompt and the
+  white underscore, filling the canvas with Postino's corner radius; PNGs and the Windows
+  `.ico` generated from it (`packaging/icons/README.md`).
+- Still to build: D (the drop overlay).
 
 ## Typography
 
