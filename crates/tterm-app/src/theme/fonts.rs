@@ -1,6 +1,6 @@
 //! The terminal fonts bundled with the app (design T), all under the SIL Open Font License 1.1
-//! (`assets/fonts/*-OFL.txt`): Cascadia Code (the default), JetBrains Mono and Fira Code, next
-//! to the Geist Mono telaio bundles. They work the same on every system, with or without them
+//! (`assets/fonts/*-OFL.txt`): Noto Sans Mono (the default), Cascadia Code, JetBrains Mono and
+//! Fira Code, next to the Geist Mono telaio bundles. They work the same on every system, with or without them
 //! installed.
 
 use std::borrow::Cow;
@@ -8,10 +8,18 @@ use std::borrow::Cow;
 use gpui_kit::App;
 
 /// The bundled terminal fonts, in the order of the font select. Geist Mono comes from telaio.
-pub const BUNDLED: [&str; 4] = ["Cascadia Code", "JetBrains Mono", "Fira Code", "Geist Mono"];
+pub const BUNDLED: [&str; 5] = [
+    "Noto Sans Mono",
+    "Cascadia Code",
+    "JetBrains Mono",
+    "Fira Code",
+    "Geist Mono",
+];
 
 /// Every font file this app adds (telaio registers Geist Mono).
-pub const FILES: [&[u8]; 10] = [
+pub const FILES: [&[u8]; 12] = [
+    include_bytes!("../../assets/fonts/NotoSansMono-Regular.ttf"),
+    include_bytes!("../../assets/fonts/NotoSansMono-Bold.ttf"),
     include_bytes!("../../assets/fonts/CascadiaCode-Regular.ttf"),
     include_bytes!("../../assets/fonts/CascadiaCode-Bold.ttf"),
     include_bytes!("../../assets/fonts/CascadiaCode-Italic.ttf"),

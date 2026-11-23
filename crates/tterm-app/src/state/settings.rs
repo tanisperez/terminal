@@ -25,11 +25,11 @@ pub const FONT_SIZE_RANGE: RangeInclusive<f32> = 8.0..=32.0;
 /// Step of the font size, in points (the stepper of Settings and Ctrl+= / Ctrl+-).
 pub const FONT_SIZE_STEP: f32 = 1.0;
 
-/// The default terminal font size, in points.
-pub const DEFAULT_FONT_SIZE: f32 = 13.0;
+/// The default terminal font size, in points, as kitty's.
+pub const DEFAULT_FONT_SIZE: f32 = 12.0;
 
 /// The default terminal font, bundled with the app (design T).
-pub const DEFAULT_FONT: &str = "Cascadia Code";
+pub const DEFAULT_FONT: &str = "Noto Sans Mono";
 
 /// Which theme mode the app follows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize)]

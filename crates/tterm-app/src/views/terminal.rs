@@ -23,7 +23,7 @@ use crate::state::drop::{DropPreview, size_label};
 use crate::state::profiles::{Origin, Profile};
 use crate::state::settings::Settings;
 use crate::theme::metrics::{
-    CURSOR_THICKNESS, SCROLL_INDICATOR_WIDTH, TERMINAL_LINE_HEIGHT, TERMINAL_PADDING_X,
+    CURSOR_THICKNESS, PIXELS_PER_POINT, SCROLL_INDICATOR_WIDTH, TERMINAL_PADDING_X,
     TERMINAL_PADDING_Y,
 };
 use crate::theme::palette::rgb;
@@ -723,16 +723,20 @@ impl TerminalView {
         {
             return *metrics;
         }
-        let font_size = px(self.font_size);
+        let font_size = px(self.font_size * PIXELS_PER_POINT);
         let text_system = window.text_system();
         let font_id = text_system.resolve_font(&font(self.font_family.clone()));
         let width = text_system
             .advance(font_id, font_size, 'm')
             .map(|size| size.width)
             .unwrap_or(font_size * 0.6);
+        // The font's own line height, rounded up as kitty does, so block and box characters
+        // drawn by the font meet the next row.
+        let ascent = text_system.ascent(font_id, font_size);
+        let descent = text_system.descent(font_id, font_size).abs();
         let metrics = CellMetrics {
             width,
-            height: px((self.font_size * TERMINAL_LINE_HEIGHT).round()),
+            height: px(f32::from(ascent + descent).ceil()),
             font_size,
         };
         self.metrics = Some((self.font_family.clone(), self.font_size, metrics));

@@ -45,7 +45,7 @@ bright black `#8b8e9a`. Programs may change them for a while (OSC 4, 10, 11, 12)
 | `TAB_CLOSE_SIZE` | 20 | The X of a tab, shown on the active tab and on hover |
 | `BAR_BUTTON_SIZE` | 28 | New tab, agent usage and settings buttons |
 | `TERMINAL_PADDING_X`, `_Y` | 18, 14 | Space around the grid |
-| `TERMINAL_LINE_HEIGHT` | 1.6 | Row height as a multiple of the font size |
+| `PIXELS_PER_POINT` | 96 / 72 | The terminal font size is in points, as kitty's; rows are the font's own height (ascent plus descent, rounded up) |
 | `CURSOR_THICKNESS` | 2 | Bar and underline cursors |
 
 ## Screens
@@ -87,7 +87,8 @@ bright black `#8b8e9a`. Programs may change them for a while (OSC 4, 10, 11, 12)
 ## Typography
 
 - Interface: Geist 13 from telaio.
-- Terminal: the `font` setting, Cascadia Code 13 by default, as board T. Cascadia Code,
-  JetBrains Mono and Fira Code are bundled (`theme/fonts.rs`, OFL 1.1), Geist Mono comes from
+- Terminal: the `font` setting, Noto Sans Mono 12 pt by default, as board T (what kitty shows
+  on the author's machine). Noto Sans Mono, Cascadia Code, JetBrains Mono and Fira Code are
+  bundled (`theme/fonts.rs`, OFL 1.1), Geist Mono comes from
   telaio; the select lists them first, then the known monospace fonts installed. Ligatures are
   on.

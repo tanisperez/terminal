@@ -23,9 +23,8 @@ pub const BAR_BUTTON_SIZE: f32 = 28.0;
 pub const TERMINAL_PADDING_X: f32 = 18.0;
 /// Space between the window edge (or the bar) and the terminal text, vertically.
 pub const TERMINAL_PADDING_Y: f32 = 14.0;
-/// Line height of the terminal, as a multiple of the font size (12.5 px over 20 px rows in
-/// the design).
-pub const TERMINAL_LINE_HEIGHT: f32 = 1.6;
+/// Pixels in a point of the terminal font size: the size is in points, as in kitty, at 96 dpi.
+pub const PIXELS_PER_POINT: f32 = 96.0 / 72.0;
 /// Width of the bar cursor and height of the underline cursor.
 pub const CURSOR_THICKNESS: f32 = 2.0;
 /// Width of the scroll position indicator at the right of a scrolled terminal.
