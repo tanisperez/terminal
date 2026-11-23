@@ -143,6 +143,7 @@ fn trim_trailing(text: &[char], body: usize, mut end: usize) -> usize {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 
