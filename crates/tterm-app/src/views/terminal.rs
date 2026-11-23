@@ -21,6 +21,7 @@ use tterm_term::{
 use crate::actions::{Copy, CopyOrInterrupt, Paste};
 use crate::state::box_drawing;
 use crate::state::drop::{DropPreview, size_label};
+use crate::state::links::{self, Link};
 use crate::state::profiles::{Origin, Profile};
 use crate::state::settings::Settings;
 use crate::theme::metrics::{
@@ -29,7 +30,7 @@ use crate::theme::metrics::{
 };
 use crate::theme::palette::rgb;
 use crate::theme::{PaletteExt as _, TerminalColors as _};
-use gpui_kit::component::menu::{ContextMenuExt as _, PopupMenu};
+use gpui_kit::component::menu::{ContextMenuExt as _, PopupMenu, PopupMenuItem};
 use rust_i18n::t;
 
 /// Scrollback kept per terminal, Ghostty's default.
@@ -116,6 +117,8 @@ pub struct TerminalView {
     blink_hidden: bool,
     /// The blinking that runs while the user types; replaced (and so stopped) on every key.
     _blink: Task<()>,
+    /// The link under the mouse while Ctrl (Cmd on macOS) is held, underlined.
+    hover_link: Option<Link>,
     /// The grid's place in the view (padding plus centering) and its size, for the resize
     /// overlay.
     grid_local: Bounds<Pixels>,
@@ -204,6 +207,7 @@ impl TerminalView {
             cursor_blink: settings.cursor_blink,
             blink_hidden: false,
             _blink: Task::ready(()),
+            hover_link: None,
             grid_local: Bounds::default(),
             grid_area: Size::default(),
             resize: ResizeOverlay::Hidden,
@@ -731,6 +735,15 @@ impl TerminalView {
         cx: &mut Context<Self>,
     ) {
         self.focus.focus(window, cx);
+        // Ctrl+click (Cmd+click on macOS) opens a link, even in a program that tracks the mouse.
+        if event.button == MouseButton::Left
+            && link_key(event.modifiers)
+            && let Some(link) = self.link_at(event.position)
+        {
+            log::info!("opening a link");
+            cx.open_url(&link.url);
+            return;
+        }
         if self.report_mouse(
             MouseAction::Press,
             Some(event.button),
@@ -794,7 +807,62 @@ impl TerminalView {
         cx.notify();
     }
 
+    /// The screen as one character per cell, for finding links.
+    fn screen_cells(&self) -> Vec<Vec<char>> {
+        let cols = usize::from(self.emulator.size().cols);
+        self.frame
+            .lines
+            .iter()
+            .map(|line| {
+                let mut cells = Vec::with_capacity(cols);
+                for run in &line.runs {
+                    cells.resize(usize::from(run.col).max(cells.len()), ' ');
+                    let chars: Vec<char> = run.text.chars().collect();
+                    if chars.len() == usize::from(run.cells) {
+                        cells.extend(chars);
+                    } else {
+                        // Wide characters: each takes two cells.
+                        for ch in chars {
+                            cells.push(ch);
+                            cells.push('\0');
+                        }
+                    }
+                }
+                cells.resize(cols, ' ');
+                cells
+            })
+            .collect()
+    }
+
+    /// The link under a window position.
+    fn link_at(&self, position: Point<Pixels>) -> Option<Link> {
+        let (col, row) = self.cell_at(position)?;
+        links::link_at(
+            &self.screen_cells(),
+            self.emulator.size().cols,
+            col,
+            usize::from(row),
+        )
+    }
+
+    /// Underlines the link under the mouse while the link key (Ctrl, Cmd on macOS) is held.
+    fn update_hover_link(
+        &mut self,
+        position: Point<Pixels>,
+        modifiers: gpui_kit::Modifiers,
+        cx: &mut Context<Self>,
+    ) {
+        let link = link_key(modifiers)
+            .then(|| self.link_at(position))
+            .flatten();
+        if link != self.hover_link {
+            self.hover_link = link;
+            cx.notify();
+        }
+    }
+
     fn on_mouse_move(&mut self, event: &MouseMoveEvent, cx: &mut Context<Self>) {
+        self.update_hover_link(event.position, event.modifiers, cx);
         if !self.selecting
             && self.report_mouse(
                 MouseAction::Motion,
@@ -942,6 +1010,7 @@ impl Render for TerminalView {
             family: self.font_family.clone(),
             focused: self.focus.is_focused(window),
             blink_hidden: self.blink_hidden,
+            link: self.hover_link.clone(),
             indicator: palette.fg_subtle.opacity(0.5),
             selection: palette.accent_subtle,
             preedit: self.preedit.clone(),
@@ -971,7 +1040,28 @@ impl Render for TerminalView {
         let menu = (!self.emulator.mouse_tracking()).then(|| {
             let focus = self.focus.clone();
             let has_selection = self.has_selection();
-            move |menu: PopupMenu, _: &mut Window, _: &mut Context<PopupMenu>| {
+            let view = cx.weak_entity();
+            move |menu: PopupMenu, window: &mut Window, cx: &mut Context<PopupMenu>| {
+                // A right click on a link offers to open it or copy it first.
+                let link = view
+                    .upgrade()
+                    .and_then(|view| view.read(cx).link_at(window.mouse_position()));
+                let menu = match link {
+                    Some(link) => {
+                        let (open, copy) = (link.url.clone(), link.url);
+                        menu.item(
+                            PopupMenuItem::new(t!("terminal.open_link"))
+                                .on_click(move |_, _, cx| cx.open_url(&open)),
+                        )
+                        .item(PopupMenuItem::new(t!("terminal.copy_link")).on_click(
+                            move |_, _, cx| {
+                                cx.write_to_clipboard(ClipboardItem::new_string(copy.clone()))
+                            },
+                        ))
+                        .separator()
+                    }
+                    None => menu,
+                };
                 menu.action_context(focus.clone())
                     .menu_with_disabled(
                         t!("terminal.copy"),
@@ -990,7 +1080,16 @@ impl Render for TerminalView {
             .bg(rgb(self.frame.background))
             .px(px(TERMINAL_PADDING_X))
             .py(px(TERMINAL_PADDING_Y))
-            .cursor(CursorStyle::IBeam)
+            .cursor(if self.hover_link.is_some() {
+                CursorStyle::PointingHand
+            } else {
+                CursorStyle::IBeam
+            })
+            .on_modifiers_changed(
+                cx.listener(|view, event: &ModifiersChangedEvent, window, cx| {
+                    view.update_hover_link(window.mouse_position(), event.modifiers, cx)
+                }),
+            )
             .on_key_down(cx.listener(|view, event, _, cx| view.on_key_down(event, cx)))
             .on_scroll(cx.listener(|view, event, _, cx| view.on_scroll(event, cx)))
             .on_mouse_down(
@@ -1064,6 +1163,24 @@ impl Render for TerminalView {
     }
 }
 
+/// Whether the modifiers are those of opening a link: Ctrl, or Cmd on macOS.
+fn link_key(modifiers: gpui_kit::Modifiers) -> bool {
+    if cfg!(target_os = "macos") {
+        modifiers.platform
+    } else {
+        modifiers.control
+    }
+}
+
+/// The last column with text on a row, so an underline across rows stops where the text does.
+fn link_row_end(frame: &Frame, row: usize) -> u16 {
+    frame
+        .lines
+        .get(row)
+        .and_then(|line| line.runs.last())
+        .map_or(0, |run| (run.col + run.cells).saturating_sub(1))
+}
+
 /// How many whole cells fit in an area, columns and rows.
 fn grid_cells(area: Size<Pixels>, metrics: CellMetrics) -> (f32, f32) {
     (
@@ -1088,6 +1205,8 @@ struct PaintData {
     focused: bool,
     /// The blinking cursor is in its hidden half.
     blink_hidden: bool,
+    /// The link to underline, under the mouse with Ctrl held.
+    link: Option<Link>,
     indicator: Hsla,
     selection: Hsla,
     /// Text an input method is composing, drawn at the cursor.
@@ -1157,6 +1276,25 @@ fn paint_grid(data: &PaintData, bounds: Bounds<Pixels>, window: &mut Window, cx:
                 window,
                 cx,
             );
+        }
+    }
+    if let Some(link) = data.link.as_ref() {
+        for row in link.start.1..=link.end.1 {
+            // A row the link goes on from ends at its last cell with text.
+            let Some((from, to)) = link.cols_on(row, link_row_end(frame, row) + 1) else {
+                continue;
+            };
+            if to < from {
+                continue;
+            }
+            let at = cell(from, row);
+            window.paint_quad(fill(
+                Bounds::new(
+                    point(at.x, at.y + metrics.height - px(2.0)),
+                    size(metrics.width * f32::from(to + 1 - from), px(1.0)),
+                ),
+                rgb(frame.foreground),
+            ));
         }
     }
     if let Some(cursor) = frame

@@ -4,6 +4,7 @@ pub mod box_drawing;
 pub mod config;
 pub mod drop;
 pub mod images;
+pub mod links;
 pub mod locale;
 pub mod profiles;
 pub mod settings;
