@@ -44,7 +44,7 @@ bright black `#8b8e9a`. Programs may change them for a while (OSC 4, 10, 11, 12)
 | `TAB_ACCENT_HEIGHT` | 2 | The accent line on top of the active tab |
 | `TAB_CLOSE_SIZE` | 20 | The X of a tab, shown on the active tab and on hover |
 | `BAR_BUTTON_SIZE` | 28 | New tab, agent usage and settings buttons |
-| `TERMINAL_PADDING_X`, `_Y` | 18, 14 | Space around the grid |
+| `TERMINAL_PADDING_X`, `_Y` | 10, 10 | Space around the grid, kitty's `window_padding_width` (board C); the grid is centered in what is left |
 | `PIXELS_PER_POINT` | 96 / 72 | The terminal font size is in points, as kitty's; rows are the font's own height (ascent plus descent, rounded up) |
 | `CURSOR_THICKNESS` | 2 | Bar and underline cursors |
 

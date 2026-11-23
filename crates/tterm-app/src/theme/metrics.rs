@@ -20,9 +20,9 @@ pub const TAB_CLOSE_SIZE: f32 = 20.0;
 /// Side of the icon buttons of the bar (new tab, usage, settings).
 pub const BAR_BUTTON_SIZE: f32 = 28.0;
 /// Space between the window edge and the terminal text, horizontally.
-pub const TERMINAL_PADDING_X: f32 = 18.0;
+pub const TERMINAL_PADDING_X: f32 = 10.0;
 /// Space between the window edge (or the bar) and the terminal text, vertically.
-pub const TERMINAL_PADDING_Y: f32 = 14.0;
+pub const TERMINAL_PADDING_Y: f32 = 10.0;
 /// Pixels in a point of the terminal font size: the size is in points, as in kitty, at 96 dpi.
 pub const PIXELS_PER_POINT: f32 = 96.0 / 72.0;
 /// Width of the bar cursor and height of the underline cursor.
