@@ -15,5 +15,5 @@ magick png/tterm-{16,24,32,48,64,128,256}.png ../../crates/tterm-app/assets/tter
 ```
 
 `crates/tterm-app/assets/tterm.rc` embeds the `.ico` in `tterm.exe` (`build.rs`): the window,
-the taskbar and Explorer use it. The macOS `.icns` and the Linux desktop entry come with the
-packaging (#11).
+the taskbar and Explorer use it. The macOS `.icns` is built from the PNGs by
+`packaging/macos/bundle.sh`; the Linux packages install the SVG and the PNGs (`packaging/linux`).
