@@ -14,8 +14,8 @@ use gpui_kit::*;
 use rust_i18n::t;
 
 use crate::actions::{
-    CONTEXT, CloseTab, NewTab, NextTab, OpenProfile, OpenSettings, OpenUsage, PreviousTab, ZoomIn,
-    ZoomOut, ZoomReset,
+    CONTEXT, CloseTab, NewTab, NextTab, OpenProfile, OpenProfilePicker, OpenSettings, OpenUsage,
+    PreviousTab, ZoomIn, ZoomOut, ZoomReset,
 };
 use crate::state::profiles::{self, Profile, Profiles};
 use crate::state::settings::{
@@ -28,6 +28,7 @@ use crate::theme::metrics::{
 };
 use crate::theme::{Palette, PaletteExt as _, TerminalColors as _};
 
+use super::profile_picker::{PickerEvent, ProfilePicker};
 use super::terminal::{TerminalEvent, TerminalView};
 use super::usage::{UsageEvent, UsageView};
 
@@ -45,6 +46,8 @@ pub struct AppView {
     pub(crate) profiles: Profiles,
     /// The font size of this session: Settings' size, changed by the zoom shortcuts.
     font_size: f32,
+    /// The keyboard profile picker, when it is open over the terminal.
+    picker: Option<(Entity<ProfilePicker>, Subscription)>,
     /// The agent usage screen, when it is open in place of the terminals.
     usage: Option<(Entity<UsageView>, Subscription)>,
     /// The category the Settings dialog shows.
@@ -74,6 +77,7 @@ impl AppView {
             font_size,
             settings_category: super::settings::Category::default(),
             usage: None,
+            picker: None,
             _subscriptions: Vec::new(),
         };
         view.rebuild_profiles();
@@ -250,6 +254,32 @@ impl AppView {
 
     fn zoom_reset(&mut self, _: &ZoomReset, _: &mut Window, cx: &mut Context<Self>) {
         self.set_font_size(self.settings.font_size, cx);
+    }
+
+    fn open_picker(&mut self, _: &OpenProfilePicker, window: &mut Window, cx: &mut Context<Self>) {
+        if self.picker.is_some() || self.profiles.list.is_empty() {
+            return;
+        }
+        let profiles = self.profiles.clone();
+        let picker = cx.new(|cx| ProfilePicker::new(profiles, cx));
+        let subscription = cx.subscribe_in(
+            &picker,
+            window,
+            |view, _, event: &PickerEvent, window, cx| {
+                view.picker = None;
+                match event {
+                    PickerEvent::Open(profile) => {
+                        let profile = profile.clone();
+                        view.open_tab(Some(&profile), None, window, cx);
+                    }
+                    PickerEvent::Close => view.focus_active(window, cx),
+                }
+                cx.notify();
+            },
+        );
+        picker.read(cx).focus_handle(cx).focus(window, cx);
+        self.picker = Some((picker, subscription));
+        cx.notify();
     }
 
     fn open_usage(&mut self, _: &OpenUsage, window: &mut Window, cx: &mut Context<Self>) {
@@ -532,6 +562,7 @@ impl Render for AppView {
         }
         v_flex()
             .key_context(CONTEXT)
+            .relative()
             .size_full()
             .bg(palette.terminal_bg())
             .text_color(palette.fg)
@@ -545,6 +576,7 @@ impl Render for AppView {
             .on_action(cx.listener(Self::zoom_reset))
             .on_action(cx.listener(Self::open_settings))
             .on_action(cx.listener(Self::open_usage))
+            .on_action(cx.listener(Self::open_picker))
             .child(self.render_bar(&palette, cx))
             .child(
                 div()
@@ -552,6 +584,9 @@ impl Render for AppView {
                     .min_h_0()
                     .when_some(active, |area, terminal| area.child(terminal)),
             )
+            .when_some(self.picker.as_ref(), |root, (picker, _)| {
+                root.child(picker.clone())
+            })
             .into_any_element()
     }
 }

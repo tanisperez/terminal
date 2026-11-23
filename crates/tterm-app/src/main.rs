@@ -73,6 +73,7 @@ fn main() -> ExitCode {
     app.run(move |cx| {
         window::init(cx, &IDENTITY);
         actions::bind_keys(cx);
+        views::bind_keys(cx);
         theme::install(cx, &settings);
 
         let sizes = window::WindowSizes {

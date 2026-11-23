@@ -1,0 +1,14 @@
+# The keyboard profile picker (design W2).
+_version: 2
+"picker.title":
+  en: "New tab with…"
+  es: "Nueva pestaña con…"
+"picker.navigate":
+  en: "navigate"
+  es: "navegar"
+"picker.open":
+  en: "open"
+  es: "abrir"
+"picker.direct":
+  en: "open directly"
+  es: "abrir directo"

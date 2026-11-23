@@ -32,6 +32,8 @@ actions!(
         ZoomReset,
         /// Opens Settings (`Ctrl+,`, `Cmd+,`).
         OpenSettings,
+        /// Opens the keyboard profile picker (`Ctrl+Shift+Space`, `Cmd+Shift+Space`).
+        OpenProfilePicker,
         /// Opens the agent usage screen.
         OpenUsage,
         /// Closes the agent usage screen (`Esc`).
@@ -94,6 +96,7 @@ pub fn bind_keys(cx: &mut App) {
     #[cfg(target_os = "macos")]
     cx.bind_keys([
         KeyBinding::new("cmd-t", NewTab, context),
+        KeyBinding::new("cmd-shift-space", OpenProfilePicker, context),
         KeyBinding::new("cmd-w", CloseTab, context),
         KeyBinding::new("ctrl-tab", NextTab, context),
         KeyBinding::new("ctrl-shift-tab", PreviousTab, context),
@@ -110,6 +113,7 @@ pub fn bind_keys(cx: &mut App) {
     #[cfg(not(target_os = "macos"))]
     cx.bind_keys([
         KeyBinding::new("ctrl-shift-t", NewTab, context),
+        KeyBinding::new("ctrl-shift-space", OpenProfilePicker, context),
         KeyBinding::new("ctrl-shift-w", CloseTab, context),
         KeyBinding::new("ctrl-tab", NextTab, context),
         KeyBinding::new("ctrl-shift-tab", PreviousTab, context),
