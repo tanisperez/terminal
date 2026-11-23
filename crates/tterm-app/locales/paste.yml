@@ -1,0 +1,5 @@
+# Pasting into the terminal.
+_version: 2
+"paste.image_pasted":
+  en: "Clipboard image pasted"
+  es: "Imagen del portapapeles pegada"

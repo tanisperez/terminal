@@ -123,6 +123,8 @@ pub struct Settings {
     pub cursor: CursorChoice,
     /// Whether pasting or dropping an image saves it as a PNG and types its path.
     pub paste_images: bool,
+    /// Days pasted images are kept before they are deleted at startup.
+    pub pasted_images_days: u32,
     /// How much is written to the log file.
     pub log_level: LogLevel,
 }
@@ -136,6 +138,7 @@ impl Default for Settings {
             font_size: DEFAULT_FONT_SIZE,
             cursor: CursorChoice::default(),
             paste_images: true,
+            pasted_images_days: 14,
             log_level: LogLevel::default(),
         }
     }
@@ -221,6 +224,12 @@ fn parse_settings(content: &str) -> Settings {
     if let Some(value) = table.get("paste_images").and_then(toml::Value::as_bool) {
         settings.paste_images = value;
     }
+    if let Some(value) = table
+        .get("pasted_images_days")
+        .and_then(toml::Value::as_integer)
+    {
+        settings.pasted_images_days = value.clamp(1, 365) as u32;
+    }
     if let Some(value) = text("log_level").and_then(LogLevel::parse) {
         settings.log_level = value;
     }
@@ -281,6 +290,7 @@ mod tests {
             font_size: 15.0,
             cursor: CursorChoice::Underline,
             paste_images: false,
+            pasted_images_days: 30,
             log_level: LogLevel::Debug,
         };
         write_settings(dir.path(), &settings);

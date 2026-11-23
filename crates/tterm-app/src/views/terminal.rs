@@ -9,6 +9,7 @@
 use std::io::Read as _;
 use std::path::{Path, PathBuf};
 
+use gpui_kit::component::WindowExt as _;
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 use tterm_term::pty::{self, Pty, SpawnOptions};
@@ -69,6 +70,8 @@ pub struct TerminalView {
     grid_origin: Point<Pixels>,
     /// Whether the left button is down over the grid, extending the selection as it moves.
     selecting: bool,
+    /// Whether a clipboard image is saved and pasted as a path (`paste_images`).
+    paste_images: bool,
     _output: Task<()>,
 }
 
@@ -109,6 +112,7 @@ impl TerminalView {
             shell: crate::state::shell::shell_name(),
             cwd,
             scroll_rest: 0.0,
+            paste_images: settings.paste_images,
             grid_origin: Point::default(),
             selecting: false,
             _output: Task::ready(()),
@@ -187,6 +191,7 @@ impl TerminalView {
     pub fn apply_settings(&mut self, settings: &Settings, cx: &mut Context<Self>) {
         self.font_family = settings.font.clone().into();
         self.font_size = settings.font_size;
+        self.paste_images = settings.paste_images;
         if let Err(error) = self.emulator.set_cursor_style(settings.cursor.into()) {
             log::warn!("cursor not changed: {error}");
         }
@@ -327,8 +332,20 @@ impl TerminalView {
         cx.notify();
     }
 
-    fn paste(&mut self, _: &Paste, _: &mut Window, cx: &mut Context<Self>) {
-        let Some(text) = cx.read_from_clipboard().and_then(|item| item.text()) else {
+    fn paste(&mut self, _: &Paste, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(item) = cx.read_from_clipboard() else {
+            return;
+        };
+        if self.paste_images
+            && let Some(image) = item.entries().iter().find_map(|entry| match entry {
+                ClipboardEntry::Image(image) => Some(image),
+                _ => None,
+            })
+        {
+            self.paste_image(&image.bytes, image.format.extension(), window, cx);
+            return;
+        }
+        let Some(text) = item.text() else {
             return;
         };
         let bytes = self.emulator.encode_paste(&text);
@@ -340,6 +357,36 @@ impl TerminalView {
             Ok(Some(text)) => cx.write_to_clipboard(ClipboardItem::new_string(text)),
             Ok(None) => {}
             Err(error) => log::debug!("selection not read: {error}"),
+        }
+    }
+
+    /// Saves a clipboard image and types its quoted path, as design E shows.
+    fn paste_image(
+        &mut self,
+        bytes: &[u8],
+        extension: &str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let saved = crate::state::images::images_dir()
+            .ok_or_else(|| "no cache folder".to_string())
+            .and_then(|dir| {
+                crate::state::images::save(&dir, bytes, extension).map_err(|e| e.to_string())
+            });
+        match saved {
+            Ok(path) => {
+                log::info!("pasted an image of {} bytes", bytes.len());
+                let quoted = crate::state::shell::quote(&path.to_string_lossy());
+                let input = self.emulator.encode_paste(&format!("{quoted} "));
+                self.send_input(&input, cx);
+                window.push_notification(
+                    gpui_kit::component::notification::Notification::success(
+                        rust_i18n::t!("paste.image_pasted").into_owned(),
+                    ),
+                    cx,
+                );
+            }
+            Err(error) => log::warn!("could not save the pasted image: {error}"),
         }
     }
 

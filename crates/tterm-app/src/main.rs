@@ -57,6 +57,17 @@ fn main() -> ExitCode {
     state::locale::apply(language);
     log::info!("language: {}", language.code());
 
+    // Pasted images older than the setting go, off the main thread.
+    let days = settings.pasted_images_days;
+    std::thread::spawn(move || {
+        if let Some(dir) = state::images::images_dir() {
+            let removed = state::images::prune(&dir, days);
+            if removed > 0 {
+                log::info!("deleted {removed} pasted images older than {days} days");
+            }
+        }
+    });
+
     let theme_choice = settings.theme;
     let app = window::application();
     app.run(move |cx| {
