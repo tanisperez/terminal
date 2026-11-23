@@ -77,6 +77,9 @@ Expo/React Native conventions here.
   `%LOCALAPPDATA%\Programs\tterm`, with "Open in Tanis Terminal" on folders. No document types
   or MIME types: a terminal opens folders, not files. The update button sits in the bar before
   the usage button (design R), and restarting always asks first, since it closes every tab.
+- Copy and paste (decided on 2026-11-23), as the author's kitty: Ctrl+C copies the selection
+  and clears it, or else goes to the program; Ctrl+V pastes. Ctrl+Shift+C and Ctrl+Shift+V stay.
+  Ctrl+click (Cmd+click) opens the URL under the mouse (`state/links.rs`).
 - Profiles (#5, decided on 2026-11-23) live in `settings.toml`: detected profiles are not
   written; the user's own ones are `[[profiles]]` tables (`name`, `shell`, `cwd`, `startup`,
   `color`, `shortcut`), plus `default_profile` and `hidden_profiles`. `startup` is typed into the
