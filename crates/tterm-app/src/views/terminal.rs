@@ -800,6 +800,7 @@ impl Render for TerminalView {
             .map(|preview| drop_overlay(preview, &palette));
         div()
             .id("terminal")
+            .key_context(crate::actions::TERMINAL_CONTEXT)
             .track_focus(&self.focus)
             .relative()
             .size_full()

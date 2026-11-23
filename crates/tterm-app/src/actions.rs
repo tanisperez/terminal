@@ -4,10 +4,13 @@
 //! Ctrl+Shift on Linux and Windows (Ctrl alone belongs to the shell) and Command on macOS, as
 //! in the design (U).
 
-use gpui_kit::{App, KeyBinding, actions};
+use gpui_kit::{App, KeyBinding, NoAction, actions};
 
 /// The key context of the window. Bindings only apply inside it.
 pub const CONTEXT: &str = "TermWindow";
+
+/// The key context of a terminal, inside [`CONTEXT`].
+pub const TERMINAL_CONTEXT: &str = "Terminal";
 
 actions!(
     tterm,
@@ -88,6 +91,14 @@ pub fn profile_keys(number: u8) -> Vec<String> {
 pub fn bind_keys(cx: &mut App) {
     let context = Some(CONTEXT);
     cx.bind_keys([KeyBinding::new("escape", CloseUsage, Some("UsageScreen"))]);
+    // gpui-kit's root moves the focus with Tab and Shift+Tab. In a terminal they belong to the
+    // shell (completion, reverse completion): `NoAction` in the deeper context masks the root's
+    // bindings, so the keys reach `TerminalView::on_key_down`.
+    let terminal = Some(TERMINAL_CONTEXT);
+    cx.bind_keys([
+        KeyBinding::new("tab", NoAction, terminal),
+        KeyBinding::new("shift-tab", NoAction, terminal),
+    ]);
     cx.bind_keys(
         (1..=crate::state::profiles::MAX_SHORTCUT)
             .zip(PROFILE_KEYS)
