@@ -1,0 +1,5 @@
+# The size shown while the window is resized (design C).
+_version: 2
+"resize.hint":
+  en: "Columns × rows. What is left is shared out on both sides"
+  es: "Columnas × filas. El sobrante se reparte a los dos lados"

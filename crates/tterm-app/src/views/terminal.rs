@@ -43,6 +43,10 @@ const BLINK_INTERVAL: std::time::Duration = std::time::Duration::from_millis(500
 /// Blinks before the cursor stays shown without typing: 15 s, kitty's default
 /// `cursor_stop_blinking_after`, so an idle terminal does no work.
 const BLINKS: u32 = 30;
+/// How long the size stays after the last change of a resize (design C).
+const RESIZE_SHOWN: std::time::Duration = std::time::Duration::from_millis(600);
+/// How long the size takes to fade out.
+const RESIZE_FADE: std::time::Duration = std::time::Duration::from_millis(200);
 /// The thumbnail of a dropped image (design D).
 const DROP_THUMBNAIL_WIDTH: f32 = 224.0;
 const DROP_THUMBNAIL_HEIGHT: f32 = 140.0;
@@ -110,7 +114,24 @@ pub struct TerminalView {
     blink_hidden: bool,
     /// The blinking that runs while the user types; replaced (and so stopped) on every key.
     _blink: Task<()>,
+    /// The grid's place in the view (padding plus centering) and its size, for the resize
+    /// overlay.
+    grid_local: Bounds<Pixels>,
+    /// The size shown while the window is resized (design C).
+    resize: ResizeOverlay,
+    /// Grows with every resize, so only the last one hides the size.
+    resize_wait: u64,
+    _resize: Task<()>,
     _output: Task<()>,
+}
+
+/// The size shown over the grid while the window is resized (design C).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ResizeOverlay {
+    Hidden,
+    Shown,
+    /// Fading out, after the resize `n` of [`TerminalView::resize_wait`].
+    Fading(u64),
 }
 
 impl EventEmitter<TerminalEvent> for TerminalView {}
@@ -179,6 +200,10 @@ impl TerminalView {
             cursor_blink: settings.cursor_blink,
             blink_hidden: false,
             _blink: Task::ready(()),
+            grid_local: Bounds::default(),
+            resize: ResizeOverlay::Hidden,
+            resize_wait: 0,
+            _resize: Task::ready(()),
             grid_origin: Point::default(),
             selecting: false,
             mouse_pressed: None,
@@ -393,6 +418,29 @@ impl TerminalView {
             }
             view.update(cx, |view, cx| {
                 view.blink_hidden = false;
+                cx.notify();
+            })
+            .ok();
+        });
+    }
+
+    /// Shows the size of the grid while it changes, and fades it out once it stops (design C).
+    fn show_resize(&mut self, cx: &mut Context<Self>) {
+        self.resize = ResizeOverlay::Shown;
+        self.resize_wait += 1;
+        let wait = self.resize_wait;
+        self._resize = cx.spawn(async move |view, cx| {
+            cx.background_executor().timer(RESIZE_SHOWN).await;
+            let fading = view.update(cx, |view, cx| {
+                view.resize = ResizeOverlay::Fading(wait);
+                cx.notify();
+            });
+            if fading.is_err() {
+                return;
+            }
+            cx.background_executor().timer(RESIZE_FADE).await;
+            view.update(cx, |view, cx| {
+                view.resize = ResizeOverlay::Hidden;
                 cx.notify();
             })
             .ok();
@@ -810,9 +858,22 @@ impl TerminalView {
             cell_width_px: f32::from(metrics.width).round() as u32,
             cell_height_px: f32::from(metrics.height).round() as u32,
         };
-        self.grid_origin = bounds.origin + grid_offset(bounds.size, metrics);
-        if size == self.emulator.size() {
+        let offset = grid_offset(bounds.size, metrics);
+        self.grid_origin = bounds.origin + offset;
+        self.grid_local = Bounds::new(
+            point(px(TERMINAL_PADDING_X), px(TERMINAL_PADDING_Y)) + offset,
+            Size {
+                width: metrics.width * f32::from(size.cols),
+                height: metrics.height * f32::from(size.rows),
+            },
+        );
+        let previous = self.emulator.size();
+        if size == previous {
             return;
+        }
+        // The first layout is not a resize.
+        if previous != GridSize::default() {
+            self.show_resize(cx);
         }
         if let Err(error) = self.emulator.resize(size) {
             log::warn!("terminal not resized: {error}");
@@ -856,6 +917,16 @@ impl Render for TerminalView {
         if !cx.has_active_drag() {
             self.drop_preview = None;
         }
+        let size = self.emulator.size();
+        let resize = (self.resize != ResizeOverlay::Hidden).then(|| {
+            resize_overlay(
+                self.grid_local,
+                (size.cols, size.rows),
+                self.resize,
+                self.font_family.clone(),
+                &palette,
+            )
+        });
         let overlay = self
             .drop_preview
             .as_ref()
@@ -934,6 +1005,7 @@ impl Render for TerminalView {
                 .size_full(),
             )
             .children(overlay)
+            .children(resize)
     }
 }
 
@@ -1438,6 +1510,70 @@ fn mods_of(modifiers: gpui_kit::Modifiers) -> Modifiers {
         alt: modifiers.alt,
         shift: modifiers.shift,
         platform: modifiers.platform,
+    }
+}
+
+/// The size of the grid over a scrim while the window is resized, with a dashed frame on the
+/// grid, centered in the view (design C).
+fn resize_overlay(
+    grid: Bounds<Pixels>,
+    (cols, rows): (u16, u16),
+    state: ResizeOverlay,
+    mono_font: SharedString,
+    palette: &crate::theme::Palette,
+) -> AnyElement {
+    let overlay = div()
+        .absolute()
+        .top_0()
+        .left_0()
+        .size_full()
+        .bg(palette.scrim)
+        .child(
+            div()
+                .absolute()
+                .left(grid.origin.x)
+                .top(grid.origin.y)
+                .w(grid.size.width)
+                .h(grid.size.height)
+                .rounded(px(6.0))
+                .border_1()
+                .border_dashed()
+                .border_color(palette.accent)
+                .bg(palette.accent_subtle.opacity(0.55)),
+        )
+        .child(
+            gpui_kit::component::v_flex()
+                .absolute()
+                .top_0()
+                .left_0()
+                .size_full()
+                .items_center()
+                .justify_center()
+                .gap(px(6.0))
+                .child(
+                    div()
+                        .font_family(mono_font)
+                        .text_size(px(28.0))
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .text_color(palette.fg)
+                        .child(format!("{cols} \u{d7} {rows}")),
+                )
+                .child(
+                    div()
+                        .text_size(px(12.5))
+                        .text_color(palette.accent_text)
+                        .child(rust_i18n::t!("resize.hint")),
+                ),
+        );
+    match state {
+        ResizeOverlay::Fading(wait) => overlay
+            .with_animation(
+                ElementId::NamedInteger("resize-fade".into(), wait),
+                Animation::new(RESIZE_FADE),
+                |overlay, delta| overlay.opacity(1.0 - delta),
+            )
+            .into_any_element(),
+        _ => overlay.into_any_element(),
     }
 }
 
