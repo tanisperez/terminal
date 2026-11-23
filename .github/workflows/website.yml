@@ -1,4 +1,4 @@
-# Publishes site/ to GitHub Pages (tterm.tanis.codes). The site is rebuilt from scratch on
+# Publishes site/ to GitHub Pages (terminal.tanis.codes). The site is rebuilt from scratch on
 # every run, there is no gh-pages branch (docs/releasing.md). The signed APT and DNF
 # repositories are added to the same upload from the deb and rpm files of the last stable
 # releases. They are skipped until the GPG_PRIVATE_KEY secret exists and a stable release does.

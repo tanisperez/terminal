@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Install tterm for Linux from its GitHub releases, for the current user by default:
 #
-#   curl -fsSL https://tterm.tanis.codes/install.sh | bash
+#   curl -fsSL https://terminal.tanis.codes/install.sh | bash
 #
 # It downloads the release tarball, checks it against the release's SHA256SUMS and lays it out
 # under a prefix (~/.local by default): the binary, the desktop entry with an absolute Exec and
@@ -21,7 +21,7 @@ set -euo pipefail
 
 name=tterm
 app_id=codes.tanis.tterm
-site=https://tterm.tanis.codes
+site=https://terminal.tanis.codes
 
 usage() {
     cat <<EOF

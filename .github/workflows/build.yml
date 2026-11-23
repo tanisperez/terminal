@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  # The Linux install script served at tterm.tanis.codes/install.sh.
+  # The Linux install script served at terminal.tanis.codes/install.sh.
   install-script:
     name: install script
     runs-on: ubuntu-latest

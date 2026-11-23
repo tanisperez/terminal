@@ -12,7 +12,7 @@
 # Environment:
 #   GPG_KEY_ID           fingerprint or id of the signing key, already in the keyring (required)
 #   GPG_PASSPHRASE_FILE  file with the key passphrase (optional, for a protected key)
-#   TTERM_REPO_URL       public base URL, default https://tterm.tanis.codes (written into
+#   TTERM_REPO_URL       public base URL, default https://terminal.tanis.codes (written into
 #                        tterm.repo, tests point it to a local server)
 set -euo pipefail
 
@@ -27,7 +27,7 @@ packages=$(realpath "$2")
 mkdir -p "$3"
 site=$(realpath "$3")
 : "${GPG_KEY_ID:?GPG_KEY_ID is not set}"
-base_url=${TTERM_REPO_URL:-https://tterm.tanis.codes}
+base_url=${TTERM_REPO_URL:-https://terminal.tanis.codes}
 
 # gpg with the key, non interactive, passphrase from a file when there is one.
 gpg_args=(--batch --yes --local-user "$GPG_KEY_ID")

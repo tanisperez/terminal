@@ -25,7 +25,7 @@ Expo/React Native conventions here.
 ## Decisions taken
 
 - Name: **Tanis Terminal**, binary `tterm`, crates `tterm-*`, app id `codes.tanis.tterm`, env
-  prefix `TTERM_`, website `tterm.tanis.codes`, repository `tanisperez/terminal` (decided on
+  prefix `TTERM_`, website `terminal.tanis.codes`, repository `tanisperez/terminal` (decided on
   2026-11-23).
 - License: Apache-2.0, as Postino. Ghostty (MIT) is credited in `NOTICE`.
 - Stack: Rust (edition 2024, stable toolchain) + `gpui-kit` 0.10.0 + telaio (`telaio-ui`,

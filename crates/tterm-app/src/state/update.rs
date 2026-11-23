@@ -37,7 +37,7 @@ pub const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// The command that installs tterm on Linux and, run again, updates it. The same as on the
 /// website.
-pub const INSTALL_COMMAND: &str = "curl -fsSL https://tterm.tanis.codes/install.sh | bash";
+pub const INSTALL_COMMAND: &str = "curl -fsSL https://terminal.tanis.codes/install.sh | bash";
 
 /// Whether this build has an updater: built with `TTERM_UPDATER=github`, running on a platform
 /// `telaio-update` knows, and not a Linux copy owned by a package manager. Read once (the
