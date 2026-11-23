@@ -746,15 +746,14 @@ impl TerminalView {
 
     /// Fits the grid to `bounds`, telling the shell when its size changes.
     fn fit(&mut self, bounds: Bounds<Pixels>, metrics: CellMetrics, cx: &mut Context<Self>) {
-        let cols = (f32::from(bounds.size.width) / f32::from(metrics.width)).floor();
-        let rows = (f32::from(bounds.size.height) / f32::from(metrics.height)).floor();
+        let (cols, rows) = grid_cells(bounds.size, metrics);
         let size = GridSize {
             cols: cols.clamp(1.0, f32::from(u16::MAX)) as u16,
             rows: rows.clamp(1.0, f32::from(u16::MAX)) as u16,
             cell_width_px: f32::from(metrics.width).round() as u32,
             cell_height_px: f32::from(metrics.height).round() as u32,
         };
-        self.grid_origin = bounds.origin;
+        self.grid_origin = bounds.origin + grid_offset(bounds.size, metrics);
         if size == self.emulator.size() {
             return;
         }
@@ -880,6 +879,25 @@ impl Render for TerminalView {
     }
 }
 
+/// How many whole cells fit in an area, columns and rows.
+fn grid_cells(area: Size<Pixels>, metrics: CellMetrics) -> (f32, f32) {
+    (
+        (f32::from(area.width) / f32::from(metrics.width)).floor(),
+        (f32::from(area.height) / f32::from(metrics.height)).floor(),
+    )
+}
+
+/// Where the grid starts in its area: half of what the whole cells leave, in whole pixels.
+fn grid_offset(area: Size<Pixels>, metrics: CellMetrics) -> Point<Pixels> {
+    let (cols, rows) = grid_cells(area, metrics);
+    let spare_x = f32::from(area.width) - cols.max(1.0) * f32::from(metrics.width);
+    let spare_y = f32::from(area.height) - rows.max(1.0) * f32::from(metrics.height);
+    point(
+        px((spare_x / 2.0).max(0.0).floor()),
+        px((spare_y / 2.0).max(0.0).floor()),
+    )
+}
+
 /// What the paint step needs, taken from the view in `render`.
 struct PaintData {
     frame: Frame,
@@ -902,7 +920,8 @@ fn paint_grid(data: &PaintData, bounds: Bounds<Pixels>, window: &mut Window, cx:
         ElementInputHandler::new(bounds, data.view.clone()),
         cx,
     );
-    let origin = bounds.origin;
+    // The grid is centered in its area, as kitty's: what is left of a cell goes half to each side.
+    let origin = bounds.origin + grid_offset(bounds.size, *metrics);
     let cell = |col: u16, row: usize| {
         point(
             origin.x + metrics.width * f32::from(col),
