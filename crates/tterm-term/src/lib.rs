@@ -20,7 +20,7 @@ pub use emulator::{
     ColorScheme, CursorStyleChoice, Effect, Emulator, Error, GridSize, SelectionUnit,
 };
 pub use frame::{BgSpan, Cursor, CursorShape, Frame, Line, Rgb, Run, ScrollState};
-pub use key::{KeyInput, Modifiers};
+pub use key::{KeyInput, Modifiers, MouseAction, MouseButton, MouseInput};
 
 /// The version of libghostty-vt this build links, for the About pane and the log.
 pub fn ghostty_version() -> String {

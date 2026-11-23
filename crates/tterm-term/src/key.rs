@@ -83,6 +83,49 @@ impl KeyInput {
     }
 }
 
+/// A mouse button, for the programs that track the mouse.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MouseButton {
+    /// The left button.
+    Left,
+    /// The middle button.
+    Middle,
+    /// The right button.
+    Right,
+    /// The wheel, one step up.
+    WheelUp,
+    /// The wheel, one step down.
+    WheelDown,
+}
+
+/// What the mouse did.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MouseAction {
+    /// A button went down (or the wheel turned one step).
+    Press,
+    /// A button went up.
+    Release,
+    /// The mouse moved.
+    Motion,
+}
+
+/// One mouse event over the grid.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct MouseInput {
+    /// What happened.
+    pub action: MouseAction,
+    /// The button, `None` for a move with no button down.
+    pub button: Option<MouseButton>,
+    /// The position from the top left corner of the grid, in pixels.
+    pub x: f32,
+    /// The position from the top left corner of the grid, in pixels.
+    pub y: f32,
+    /// The modifiers held.
+    pub mods: Modifiers,
+    /// Whether some button is down (for motion while dragging).
+    pub any_pressed: bool,
+}
+
 /// The physical key of a gpui key name, `Key::Unidentified` for one the encoder has no code for
 /// (it then encodes the text alone).
 pub(crate) fn physical_key(name: &str) -> Key {

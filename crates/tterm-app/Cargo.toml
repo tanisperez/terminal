@@ -31,3 +31,9 @@ pretty_assertions = { workspace = true }
 
 [lints]
 workspace = true
+
+# The icons are embedded by rust-embed, which in a debug build reads them from the build
+# machine's disk instead. A debug build cross-compiled for Windows (cargo-xwin) runs on another
+# machine, so it embeds them too. Same version as gpui-kit-assets.
+[target.'cfg(windows)'.dependencies]
+rust-embed = { version = "8.14.0", features = ["debug-embed"] }

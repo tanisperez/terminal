@@ -100,6 +100,15 @@ tterm-app ──> tterm-term ──> ghostty-vt, portable-pty
   input; `views/root.rs` holds the tabs and the bar; `views/settings.rs` the Settings dialog.
   UI state that can be tested without a window lives in `state/`.
 
+How keys reach the shell: gpui's key bindings first (the app's shortcuts), then
+`TerminalView::on_key_down` for keys without text (Enter, arrows, Ctrl and Alt combinations),
+encoded by libghostty-vt. Text goes through the view's input handler (`EntityInputHandler`,
+`replace_text_in_range`), as the platform composes it: dead keys, AltGr characters, input
+methods (whose preedit is drawn at the cursor). On Windows a key handled in `on_key_down` skips
+`TranslateMessage`, so handling a text key there would leave a pending dead key to spoil the
+next characters (seen in the Windows 11 VM: `´` then `a` gave `ã`). Only a program that asks the
+Kitty protocol to report every key gets text keys encoded.
+
 How output reaches the screen: a thread per tab reads the pseudo terminal and sends chunks
 through a bounded channel to a task on the window's thread, which joins what is waiting (up to
 1 MB), feeds the emulator once, writes the answers back to the shell and repaints. A program that
@@ -122,6 +131,12 @@ The shared rules (section 8) apply in full. On top of that, for tterm:
   frame; the pseudo terminal by running `/bin/sh -c ...`.
 - Visual checks in the real app as in the shared rules (section 17): XWayland, `xdotool`,
   `spectacle`, isolated `XDG_CONFIG_HOME` and `XDG_STATE_HOME`, killing only our own PID.
+- Windows: cross-build with cargo-xwin and `GHOSTTY_VT_PREBUILT_MSVC=1` (the prebuilt
+  libghostty-vt links with lld-link), and test in the Windows 11 VM (see the user's memory).
+  Cross-build in debug: a release build needs Windows' shader compiler (`fxc`, gpui's
+  build script). Windows debug builds embed the icons (rust-embed's `debug-embed`, in
+  `tterm-app`'s Cargo.toml); without it they are read from the build machine's disk and every
+  icon is empty in the VM.
 - Debug hooks, read once at startup: `TTERM_LOG=<level>`, `TTERM_OPEN=<state>` (`settings`,
   `settings-profiles`, `settings-about`, `usage`).
 

@@ -6928,6 +6928,7 @@ dependencies = [
  "gpui-kit",
  "log",
  "pretty_assertions",
+ "rust-embed",
  "rust-i18n",
  "serde",
  "telaio-app",

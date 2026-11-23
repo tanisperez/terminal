@@ -61,13 +61,9 @@ impl AppView {
         cx: &mut Context<Self>,
     ) -> Self {
         let font_size = settings.font_size;
-        // Detection runs `wsl.exe` on Windows, so it goes to the background there; elsewhere it
-        // only reads `/etc/shells` and the first tab needs it.
-        let detected = if cfg!(windows) {
-            Vec::new()
-        } else {
-            profiles::detect(&t!("profiles.command_prompt"))
-        };
+        // On Windows this runs `wsl.exe -l -q`, about 50 ms (measured in a Windows 11 VM),
+        // before the first tab, which opens the default profile (a WSL distribution in W1).
+        let detected = profiles::detect(&t!("profiles.command_prompt"));
         let mut view = Self {
             settings,
             tabs: Tabs::default(),
@@ -92,21 +88,6 @@ impl AppView {
                 ..profile
             });
             view.open_tab(profile.as_ref(), Some(dir), window, cx);
-        }
-        if cfg!(windows) {
-            let name = t!("profiles.command_prompt").into_owned();
-            cx.spawn(async move |view, cx| {
-                let detected = cx
-                    .background_spawn(async move { profiles::detect(&name) })
-                    .await;
-                view.update(cx, |view, cx| {
-                    view.detected = detected;
-                    view.rebuild_profiles();
-                    cx.notify();
-                })
-                .ok();
-            })
-            .detach();
         }
         view.tabs.activate(0);
         view.focus_active(window, cx);
@@ -344,7 +325,13 @@ impl AppView {
         };
         let mut row = h_flex().size_full().items_start();
         if shows_tabs {
-            let mut strip = h_flex().items_start().min_w_0().flex_shrink(1.0);
+            // Tabs shrink to their minimum; past it the strip clips them and the buttons of the
+            // bar stay in place.
+            let mut strip = h_flex()
+                .items_start()
+                .min_w_0()
+                .flex_shrink(1.0)
+                .overflow_hidden();
             for (index, tab) in self.tabs.iter().enumerate() {
                 let active = index == self.tabs.active_index();
                 let label = tab.read(cx).label();
@@ -443,8 +430,9 @@ impl AppView {
             .group(group)
             .relative()
             .flex_shrink(1.0)
-            .flex_basis(px(TAB_MAX_WIDTH))
+            .w(px(TAB_MAX_WIDTH))
             .min_w(px(TAB_MIN_WIDTH))
+            .overflow_hidden()
             .h(px(if active {
                 TAB_BAR_HEIGHT
             } else {

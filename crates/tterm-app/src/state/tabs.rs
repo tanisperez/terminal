@@ -103,7 +103,10 @@ impl<T> Tabs<T> {
 /// (`zsh · postino`), as in the design.
 pub fn tab_label(title: &str, shell: &str, folder: Option<&str>) -> String {
     let title = title.trim();
-    if !title.is_empty() {
+    // Windows names a console after the program's path (`C:\...\powershell.exe`): the
+    // profile's name says it better.
+    let program_path = title.to_ascii_lowercase().ends_with(".exe");
+    if !title.is_empty() && !program_path {
         return title.to_string();
     }
     match folder.filter(|folder| !folder.is_empty()) {
@@ -219,6 +222,10 @@ mod tests {
         assert_eq!(tab_label("vim", "zsh", Some("postino")), "vim");
         assert_eq!(tab_label("  ", "zsh", Some("postino")), "zsh · postino");
         assert_eq!(tab_label("", "bash", None), "bash");
+        assert_eq!(
+            tab_label(r"C:\WINDOWS\System32\cmd.exe", "Símbolo del sistema", None),
+            "Símbolo del sistema"
+        );
     }
 
     #[test]

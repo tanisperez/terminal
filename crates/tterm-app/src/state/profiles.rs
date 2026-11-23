@@ -274,6 +274,16 @@ pub fn shifted_digit(key: &str) -> Option<u8> {
     Some(digit)
 }
 
+/// The profile number of Ctrl+Shift+digit, from the key gpui reports and whether Shift is
+/// reported. Linux reports the symbol with Shift on; Windows reports the symbol with Shift off
+/// (it is part of the character). A digit needs Shift; `/` too, as Ctrl+/ without Shift is a key
+/// of its own on a US layout (undo in readline); other symbols imply it.
+pub fn profile_shortcut(key: &str, shift: bool) -> Option<u8> {
+    let digit = shifted_digit(key)?;
+    let needs_shift = key.chars().all(|c| c.is_ascii_digit()) || matches!(key, "/" | "slash");
+    (shift || !needs_shift).then_some(digit)
+}
+
 /// Splits a shell command line on spaces, keeping what is inside double quotes together.
 pub fn split_command(text: &str) -> Vec<String> {
     let mut parts = Vec::new();
@@ -361,13 +371,20 @@ pub fn parse_wsl_list(output: &[u8]) -> Vec<String> {
         .collect()
 }
 
-/// The profiles of this machine. Runs `wsl.exe` on Windows, so call it off the main thread.
+/// The profiles of this machine. On Windows it runs `wsl.exe -l -q` (about 50 ms).
 pub fn detect(command_prompt_name: &str) -> Vec<Profile> {
     if cfg!(windows) {
         let mut found: Vec<Profile> = Vec::new();
-        let output = std::process::Command::new("wsl.exe")
-            .args(["-l", "-q"])
-            .output();
+        let mut command = std::process::Command::new("wsl.exe");
+        command.args(["-l", "-q"]);
+        // No console window flashing from a GUI app.
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt as _;
+            const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+            command.creation_flags(CREATE_NO_WINDOW);
+        }
+        let output = command.output();
         if let Ok(output) = output {
             for distro in parse_wsl_list(&output.stdout) {
                 found.push(Profile::detected(
@@ -448,6 +465,19 @@ mod tests {
         assert_eq!(shifted_digit("quotedbl"), Some(2));
         assert_eq!(shifted_digit("9"), Some(9));
         assert_eq!(shifted_digit("a"), None);
+    }
+
+    #[test]
+    fn profile_shortcuts_read_linux_and_windows_reports() {
+        // Linux: the keysym with Shift reported.
+        assert_eq!(profile_shortcut("periodcentered", true), Some(3));
+        // Windows: the character, Shift folded into it.
+        assert_eq!(profile_shortcut("\"", false), Some(2));
+        assert_eq!(profile_shortcut("·", false), Some(3));
+        // Ctrl+3 and Ctrl+/ are not profile shortcuts.
+        assert_eq!(profile_shortcut("3", false), None);
+        assert_eq!(profile_shortcut("/", false), None);
+        assert_eq!(profile_shortcut("/", true), Some(7));
     }
 
     #[test]

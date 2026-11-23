@@ -12,10 +12,10 @@ use ghostty_vt::screen::TrackedGridRef;
 use ghostty_vt::selection::{FormatOptions, SelectLineOptions, SelectWordOptions, Selection};
 use ghostty_vt::style::{Palette, RgbColor, Underline};
 use ghostty_vt::terminal::{CursorStyle, Mode, Point, PointCoordinate, ScrollViewport};
-use ghostty_vt::{RenderState, Terminal, TerminalOptions, key};
+use ghostty_vt::{RenderState, Terminal, TerminalOptions, key, mouse};
 
 use crate::frame::{BgSpan, Cursor, CursorShape, Frame, Line, Rgb, Run, ScrollState};
-use crate::key::{KeyInput, is_modifier, physical_key};
+use crate::key::{KeyInput, MouseAction, MouseButton, MouseInput, is_modifier, physical_key};
 
 /// What went wrong in the emulator. libghostty-vt only fails on out of memory or a value it
 /// does not know, so these are rare and the caller logs them.
@@ -107,6 +107,8 @@ pub struct Emulator {
     cells: CellIterator,
     keys: key::Encoder,
     key_event: key::Event,
+    mouse: mouse::Encoder,
+    mouse_event: mouse::Event,
     frame: Frame,
     size: GridSize,
     /// Where a mouse selection started, kept by libghostty-vt as the screen scrolls.
@@ -151,6 +153,8 @@ impl Emulator {
             cells: CellIterator::new()?,
             keys: key::Encoder::new()?,
             key_event: key::Event::new()?,
+            mouse: mouse::Encoder::new()?,
+            mouse_event: mouse::Event::new()?,
             frame: Frame::default(),
             size,
             anchor: None,
@@ -262,6 +266,14 @@ impl Emulator {
         self.terminal.is_mouse_tracking().unwrap_or(false)
     }
 
+    /// Whether the program asked the Kitty keyboard protocol to report every key as an escape
+    /// code, text keys included; otherwise text is sent as typed.
+    pub fn reports_all_keys(&self) -> bool {
+        self.terminal
+            .kitty_keyboard_flags()
+            .is_ok_and(|flags| flags.contains(key::KittyKeyFlags::REPORT_ALL))
+    }
+
     /// Whether the alternate screen is on (a full screen program such as vim or less).
     pub fn alternate_screen(&self) -> bool {
         self.terminal.mode(Mode::ALT_SCREEN_SAVE).unwrap_or(false)
@@ -300,6 +312,52 @@ impl Emulator {
         let mut out = Vec::new();
         if let Err(error) = self.keys.encode_to_vec(&self.key_event, &mut out) {
             log::debug!("key not encoded: {error}");
+        }
+        out
+    }
+
+    /// The bytes of a mouse event for a program that tracks the mouse (vim, htop, less), in the
+    /// protocol it asked for; empty when it does not track it or this event.
+    pub fn encode_mouse(&mut self, input: &MouseInput) -> Vec<u8> {
+        if !self.mouse_tracking() {
+            return Vec::new();
+        }
+        let size = self.size;
+        self.mouse
+            .set_options_from_terminal(&self.terminal)
+            .set_size(mouse::EncoderSize {
+                screen_width: u32::from(size.cols) * size.cell_width_px.max(1),
+                screen_height: u32::from(size.rows) * size.cell_height_px.max(1),
+                cell_width: size.cell_width_px.max(1),
+                cell_height: size.cell_height_px.max(1),
+                padding_top: 0,
+                padding_bottom: 0,
+                padding_right: 0,
+                padding_left: 0,
+            })
+            .set_any_button_pressed(input.any_pressed)
+            .set_track_last_cell(true);
+        self.mouse_event
+            .set_action(match input.action {
+                MouseAction::Press => mouse::Action::Press,
+                MouseAction::Release => mouse::Action::Release,
+                MouseAction::Motion => mouse::Action::Motion,
+            })
+            .set_button(input.button.map(|button| match button {
+                MouseButton::Left => mouse::Button::Left,
+                MouseButton::Middle => mouse::Button::Middle,
+                MouseButton::Right => mouse::Button::Right,
+                MouseButton::WheelUp => mouse::Button::Four,
+                MouseButton::WheelDown => mouse::Button::Five,
+            }))
+            .set_mods(input.mods.to_ghostty())
+            .set_position(mouse::Position {
+                x: input.x,
+                y: input.y,
+            });
+        let mut out = Vec::new();
+        if let Err(error) = self.mouse.encode_to_vec(&self.mouse_event, &mut out) {
+            log::debug!("mouse event not encoded: {error}");
         }
         out
     }
@@ -823,6 +881,41 @@ mod tests {
             term.encode_key(&KeyInput::named("shift", Modifiers::NONE)),
             b""
         );
+    }
+
+    #[test]
+    fn the_kitty_protocol_can_ask_for_every_key() {
+        let mut term = emulator(10, 2);
+        assert!(!term.reports_all_keys());
+        // CSI > 8 u: push the "report all keys as escape codes" flag.
+        term.feed(b"\x1b[>8u");
+        assert!(term.reports_all_keys());
+    }
+
+    fn click(action: MouseAction, button: Option<MouseButton>, col: f32, row: f32) -> MouseInput {
+        // GridSize::default() cells are 8 x 16 pixels; aim at the middle of the cell.
+        MouseInput {
+            action,
+            button,
+            x: col * 8.0 + 4.0,
+            y: row * 16.0 + 8.0,
+            mods: Modifiers::NONE,
+            any_pressed: false,
+        }
+    }
+
+    #[test]
+    fn mouse_events_go_only_to_programs_that_track_the_mouse() {
+        let mut term = emulator(20, 5);
+        let press = click(MouseAction::Press, Some(MouseButton::Left), 2.0, 1.0);
+        assert_eq!(term.encode_mouse(&press), b"");
+        // Normal tracking (1000) in the SGR format (1006), as vim and htop ask.
+        term.feed(b"\x1b[?1000h\x1b[?1006h");
+        assert_eq!(term.encode_mouse(&press), b"\x1b[<0;3;2M");
+        let release = click(MouseAction::Release, Some(MouseButton::Left), 2.0, 1.0);
+        assert_eq!(term.encode_mouse(&release), b"\x1b[<0;3;2m");
+        let wheel = click(MouseAction::Press, Some(MouseButton::WheelDown), 0.0, 0.0);
+        assert_eq!(term.encode_mouse(&wheel), b"\x1b[<65;1;1M");
     }
 
     #[test]

@@ -14,7 +14,8 @@ use gpui_kit::prelude::*;
 use gpui_kit::*;
 use tterm_term::pty::{self, Pty, SpawnOptions};
 use tterm_term::{
-    CursorShape, Effect, Emulator, Frame, GridSize, KeyInput, Modifiers, SelectionUnit,
+    CursorShape, Effect, Emulator, Frame, GridSize, KeyInput, Modifiers, MouseAction, MouseInput,
+    SelectionUnit,
 };
 
 use crate::actions::{Copy, Paste};
@@ -78,11 +79,15 @@ pub struct TerminalView {
     cwd: Option<PathBuf>,
     /// Lines of a smooth scroll (a touchpad) not scrolled yet.
     scroll_rest: f32,
+    /// Text an input method is composing (a dead key, an IME), not sent yet.
+    preedit: Option<String>,
     /// The top left corner of the grid in the window, from the last layout, to turn mouse
     /// positions into cells.
     grid_origin: Point<Pixels>,
     /// Whether the left button is down over the grid, extending the selection as it moves.
     selecting: bool,
+    /// The button pressed while a program tracks the mouse, for its release and drags.
+    mouse_pressed: Option<MouseButton>,
     /// Whether a clipboard image is saved and pasted as a path (`paste_images`).
     paste_images: bool,
     _output: Task<()>,
@@ -138,9 +143,11 @@ impl TerminalView {
                 .map(|profile| profile.name.clone()),
             cwd,
             scroll_rest: 0.0,
+            preedit: None,
             paste_images: settings.paste_images,
             grid_origin: Point::default(),
             selecting: false,
+            mouse_pressed: None,
             _output: Task::ready(()),
         };
         match pty::spawn(&options) {
@@ -355,25 +362,44 @@ impl TerminalView {
 
     fn on_key_down(&mut self, event: &KeyDownEvent, cx: &mut Context<Self>) {
         let keystroke = &event.keystroke;
-        log::trace!(
-            "key {:?} char {:?} ctrl {} alt {} shift {}",
-            keystroke.key,
-            keystroke.key_char,
-            keystroke.modifiers.control,
-            keystroke.modifiers.alt,
-            keystroke.modifiers.shift
-        );
-        // Ctrl+Shift+digit opens a profile. A binding only matches it on a US layout: elsewhere
-        // gpui names the key by its symbol (`periodcentered` for Shift+3 in Spanish).
         let mods = keystroke.modifiers;
+        // Shortcuts only, never plain typing (the log never holds what the user types).
+        if mods.control || mods.alt {
+            log::trace!(
+                "shortcut key {:?} ctrl {} alt {} shift {} character input {}",
+                keystroke.key,
+                mods.control,
+                mods.alt,
+                mods.shift,
+                event.prefer_character_input
+            );
+        }
+        // Ctrl+Shift+digit opens a profile, checked first: Windows marks it as character input
+        // on layouts where Shift+digit is a symbol. A binding only matches it on a US layout: elsewhere
+        // gpui names the key by its symbol (`periodcentered` for Shift+3 in Spanish).
         if !cfg!(target_os = "macos")
             && mods.control
-            && mods.shift
             && !mods.alt
-            && let Some(number) = crate::state::profiles::shifted_digit(&keystroke.key)
+            && let Some(number) =
+                crate::state::profiles::profile_shortcut(&keystroke.key, mods.shift)
         {
             cx.stop_propagation();
             cx.emit(TerminalEvent::OpenProfile(number));
+            return;
+        }
+        // Text goes through the input handler (`replace_text_in_range`), as the platform sends it:
+        // characters the layout composes (AltGr on Windows, `@` and `#` in Spanish), dead keys
+        // and input methods. Handling a text key here would skip Windows' `TranslateMessage` and
+        // leave a pending dead key to spoil the next characters. Only a program that asked the
+        // Kitty protocol for every key gets text keys encoded.
+        let plain_text = keystroke
+            .key_char
+            .as_deref()
+            .is_some_and(|text| !text.chars().any(char::is_control))
+            && !mods.control
+            && !mods.alt
+            && !mods.platform;
+        if event.prefer_character_input || (plain_text && !self.emulator.reports_all_keys()) {
             return;
         }
         // Command shortcuts belong to the app and the system on macOS.
@@ -383,12 +409,7 @@ impl TerminalView {
         let input = KeyInput {
             key: keystroke.key.clone(),
             text: keystroke.key_char.clone(),
-            mods: Modifiers {
-                ctrl: keystroke.modifiers.control,
-                alt: keystroke.modifiers.alt,
-                shift: keystroke.modifiers.shift,
-                platform: keystroke.modifiers.platform,
-            },
+            mods: mods_of(keystroke.modifiers),
             repeat: event.is_held,
         };
         let bytes = self.emulator.encode_key(&input);
@@ -409,6 +430,26 @@ impl TerminalView {
             return;
         }
         self.scroll_rest -= lines;
+        if self.emulator.mouse_tracking() && !event.modifiers.shift {
+            let button = if lines > 0.0 {
+                tterm_term::MouseButton::WheelUp
+            } else {
+                tterm_term::MouseButton::WheelDown
+            };
+            let mut bytes = Vec::new();
+            for _ in 0..lines.abs() as usize {
+                bytes.extend(self.emulator.encode_mouse(&MouseInput {
+                    action: MouseAction::Press,
+                    button: Some(button),
+                    x: f32::from(event.position.x - self.grid_origin.x),
+                    y: f32::from(event.position.y - self.grid_origin.y),
+                    mods: mods_of(event.modifiers),
+                    any_pressed: false,
+                }));
+            }
+            self.write(&bytes);
+            return;
+        }
         if self.emulator.alternate_screen() && !self.emulator.mouse_tracking() {
             // A full screen program without mouse support scrolls with the arrow keys, as in
             // most terminals.
@@ -486,6 +527,80 @@ impl TerminalView {
         }
     }
 
+    /// Sends a mouse event to a program that tracks the mouse (vim, htop, less --mouse) and
+    /// returns whether it went there. Shift keeps the mouse for selecting text, as in most
+    /// terminals.
+    fn report_mouse(
+        &mut self,
+        action: MouseAction,
+        button: Option<MouseButton>,
+        position: Point<Pixels>,
+        modifiers: gpui_kit::Modifiers,
+    ) -> bool {
+        if modifiers.shift || !self.emulator.mouse_tracking() {
+            return false;
+        }
+        let button = match button {
+            Some(MouseButton::Left) => Some(tterm_term::MouseButton::Left),
+            Some(MouseButton::Middle) => Some(tterm_term::MouseButton::Middle),
+            Some(MouseButton::Right) => Some(tterm_term::MouseButton::Right),
+            Some(_) => return false,
+            None => None,
+        };
+        let input = MouseInput {
+            action,
+            button,
+            x: f32::from(position.x - self.grid_origin.x),
+            y: f32::from(position.y - self.grid_origin.y),
+            mods: mods_of(modifiers),
+            any_pressed: self.mouse_pressed.is_some(),
+        };
+        let bytes = self.emulator.encode_mouse(&input);
+        self.write(&bytes);
+        true
+    }
+
+    fn on_button_down(
+        &mut self,
+        event: &MouseDownEvent,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.focus.focus(window, cx);
+        if self.report_mouse(
+            MouseAction::Press,
+            Some(event.button),
+            event.position,
+            event.modifiers,
+        ) {
+            self.mouse_pressed = Some(event.button);
+            return;
+        }
+        if event.button == MouseButton::Left {
+            self.on_mouse_down(event, cx);
+        }
+    }
+
+    fn on_button_up(&mut self, event: &MouseUpEvent, cx: &mut Context<Self>) {
+        if self.mouse_pressed == Some(event.button) {
+            self.mouse_pressed = None;
+            self.report_mouse(
+                MouseAction::Release,
+                Some(event.button),
+                event.position,
+                event.modifiers,
+            );
+            return;
+        }
+        match event.button {
+            MouseButton::Left => self.on_mouse_up(cx),
+            // The middle button pastes the primary selection, as in X11 and Wayland terminals.
+            #[cfg(target_os = "linux")]
+            MouseButton::Middle => self.paste_primary(cx),
+            _ => {}
+        }
+    }
+
     /// The visible cell under a window position, clamped to the grid.
     fn cell_at(&self, position: Point<Pixels>) -> Option<(u16, u16)> {
         let (_, _, metrics) = self.metrics.as_ref()?;
@@ -497,13 +612,7 @@ impl TerminalView {
         Some((col, row))
     }
 
-    fn on_mouse_down(
-        &mut self,
-        event: &MouseDownEvent,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        self.focus.focus(window, cx);
+    fn on_mouse_down(&mut self, event: &MouseDownEvent, cx: &mut Context<Self>) {
         let Some((col, row)) = self.cell_at(event.position) else {
             return;
         };
@@ -522,6 +631,16 @@ impl TerminalView {
     }
 
     fn on_mouse_move(&mut self, event: &MouseMoveEvent, cx: &mut Context<Self>) {
+        if !self.selecting
+            && self.report_mouse(
+                MouseAction::Motion,
+                self.mouse_pressed,
+                event.position,
+                event.modifiers,
+            )
+        {
+            return;
+        }
         if !self.selecting || event.pressed_button != Some(MouseButton::Left) {
             return;
         }
@@ -643,6 +762,9 @@ impl Render for TerminalView {
             focused: self.focus.is_focused(window),
             indicator: palette.fg_subtle.opacity(0.5),
             selection: palette.accent_subtle,
+            preedit: self.preedit.clone(),
+            view: cx.entity(),
+            focus: self.focus.clone(),
         };
         let view = cx.weak_entity();
         div()
@@ -657,26 +779,33 @@ impl Render for TerminalView {
             .on_scroll(cx.listener(|view, event, _, cx| view.on_scroll(event, cx)))
             .on_mouse_down(
                 MouseButton::Left,
-                cx.listener(|view, event, window, cx| view.on_mouse_down(event, window, cx)),
+                cx.listener(|view, event, window, cx| view.on_button_down(event, window, cx)),
+            )
+            .on_mouse_down(
+                MouseButton::Middle,
+                cx.listener(|view, event, window, cx| view.on_button_down(event, window, cx)),
+            )
+            .on_mouse_down(
+                MouseButton::Right,
+                cx.listener(|view, event, window, cx| view.on_button_down(event, window, cx)),
             )
             .on_mouse_move(cx.listener(|view, event, _, cx| view.on_mouse_move(event, cx)))
             .on_mouse_up(
                 MouseButton::Left,
-                cx.listener(|view, _, _, cx| view.on_mouse_up(cx)),
+                cx.listener(|view, event, _, cx| view.on_button_up(event, cx)),
+            )
+            .on_mouse_up(
+                MouseButton::Middle,
+                cx.listener(|view, event, _, cx| view.on_button_up(event, cx)),
+            )
+            .on_mouse_up(
+                MouseButton::Right,
+                cx.listener(|view, event, _, cx| view.on_button_up(event, cx)),
             )
             .on_mouse_up_out(
                 MouseButton::Left,
-                cx.listener(|view, _, _, cx| view.on_mouse_up(cx)),
+                cx.listener(|view, event, _, cx| view.on_button_up(event, cx)),
             )
-            .when(cfg!(target_os = "linux"), |area| {
-                area.on_mouse_up(
-                    MouseButton::Middle,
-                    cx.listener(|_view, _, _, _cx| {
-                        #[cfg(target_os = "linux")]
-                        _view.paste_primary(_cx);
-                    }),
-                )
-            })
             .on_action(cx.listener(Self::paste))
             .on_action(cx.listener(Self::copy))
             .on_drop(
@@ -703,10 +832,20 @@ struct PaintData {
     focused: bool,
     indicator: Hsla,
     selection: Hsla,
+    /// Text an input method is composing, drawn at the cursor.
+    preedit: Option<String>,
+    /// The view, to register it as the input handler of the window.
+    view: Entity<TerminalView>,
+    focus: FocusHandle,
 }
 
 fn paint_grid(data: &PaintData, bounds: Bounds<Pixels>, window: &mut Window, cx: &mut App) {
     let PaintData { frame, metrics, .. } = data;
+    window.handle_input(
+        &data.focus,
+        ElementInputHandler::new(bounds, data.view.clone()),
+        cx,
+    );
     let origin = bounds.origin;
     let cell = |col: u16, row: usize| {
         point(
@@ -811,6 +950,26 @@ fn paint_grid(data: &PaintData, bounds: Bounds<Pixels>, window: &mut Window, cx:
             )),
         }
     }
+    if let (Some(text), Some(cursor)) = (data.preedit.as_deref(), frame.cursor) {
+        let at = cell(cursor.col, usize::from(cursor.row));
+        let cells = text.chars().count().max(1) as u16;
+        window.paint_quad(fill(
+            Bounds::new(at, size(metrics.width * f32::from(cells), metrics.height)),
+            rgb(frame.background),
+        ));
+        paint_text(
+            text,
+            regular.clone(),
+            rgb(frame.foreground),
+            true,
+            false,
+            cells,
+            at,
+            *metrics,
+            window,
+            cx,
+        );
+    }
     let scroll = frame.scroll;
     if !scroll.at_bottom() && scroll.total > 0 {
         let height = f32::from(bounds.size.height);
@@ -912,5 +1071,112 @@ fn read_output(mut reader: pty::PtyReader, sender: async_channel::Sender<Vec<u8>
             // A Unix pty reports EIO once the shell exits.
             Err(_) => break,
         }
+    }
+}
+
+/// The terminal takes text from input methods: dead keys, AltGr characters on Windows, IME
+/// composition. There is no document to edit, so ranges are empty and the composed text is
+/// sent to the program when it is committed.
+impl EntityInputHandler for TerminalView {
+    fn text_for_range(
+        &mut self,
+        _range: std::ops::Range<usize>,
+        _adjusted_range: &mut Option<std::ops::Range<usize>>,
+        _window: &mut Window,
+        _cx: &mut Context<Self>,
+    ) -> Option<String> {
+        None
+    }
+
+    fn selected_text_range(
+        &mut self,
+        _ignore_disabled_input: bool,
+        _window: &mut Window,
+        _cx: &mut Context<Self>,
+    ) -> Option<UTF16Selection> {
+        Some(UTF16Selection {
+            range: 0..0,
+            reversed: false,
+        })
+    }
+
+    fn marked_text_range(
+        &self,
+        _window: &mut Window,
+        _cx: &mut Context<Self>,
+    ) -> Option<std::ops::Range<usize>> {
+        self.preedit
+            .as_ref()
+            .map(|text| 0..text.encode_utf16().count())
+    }
+
+    fn unmark_text(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
+        if self.preedit.take().is_some() {
+            cx.notify();
+        }
+    }
+
+    fn replace_text_in_range(
+        &mut self,
+        _range: Option<std::ops::Range<usize>>,
+        text: &str,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.preedit = None;
+        if !text.is_empty() {
+            self.send_input(text.as_bytes(), cx);
+        }
+        cx.notify();
+    }
+
+    fn replace_and_mark_text_in_range(
+        &mut self,
+        _range: Option<std::ops::Range<usize>>,
+        new_text: &str,
+        _new_selected_range: Option<std::ops::Range<usize>>,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.preedit = (!new_text.is_empty()).then(|| new_text.to_string());
+        cx.notify();
+    }
+
+    fn bounds_for_range(
+        &mut self,
+        _range_utf16: std::ops::Range<usize>,
+        _element_bounds: Bounds<Pixels>,
+        _window: &mut Window,
+        _cx: &mut Context<Self>,
+    ) -> Option<Bounds<Pixels>> {
+        // The input method's window goes under the cursor.
+        let (_, _, metrics) = self.metrics.as_ref()?;
+        let cursor = self.frame.cursor?;
+        Some(Bounds::new(
+            point(
+                self.grid_origin.x + metrics.width * f32::from(cursor.col),
+                self.grid_origin.y + metrics.height * f32::from(cursor.row),
+            ),
+            size(metrics.width, metrics.height),
+        ))
+    }
+
+    fn character_index_for_point(
+        &mut self,
+        _point: Point<Pixels>,
+        _window: &mut Window,
+        _cx: &mut Context<Self>,
+    ) -> Option<usize> {
+        None
+    }
+}
+
+/// gpui's modifiers as the emulator's.
+fn mods_of(modifiers: gpui_kit::Modifiers) -> Modifiers {
+    Modifiers {
+        ctrl: modifiers.control,
+        alt: modifiers.alt,
+        shift: modifiers.shift,
+        platform: modifiers.platform,
     }
 }
