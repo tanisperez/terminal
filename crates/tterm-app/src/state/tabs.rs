@@ -24,8 +24,9 @@ impl<T> Tabs<T> {
         self.tabs.is_empty()
     }
 
-    /// Whether the tab bar shows: only with two tabs or more, as in the design (A2).
-    pub fn shows_bar(&self) -> bool {
+    /// Whether a tab can be closed from the bar: only with two tabs or more. The bar always
+    /// shows, and a single tab has no close button: closing it is closing the window (A4).
+    pub fn closable(&self) -> bool {
         self.tabs.len() > 1
     }
 
@@ -190,9 +191,9 @@ mod tests {
     }
 
     #[test]
-    fn the_bar_shows_from_two_tabs() {
-        assert!(!tabs(&["a"]).shows_bar());
-        assert!(tabs(&["a", "b"]).shows_bar());
+    fn a_single_tab_is_not_closed_from_the_bar() {
+        assert!(!tabs(&["a"]).closable());
+        assert!(tabs(&["a", "b"]).closable());
     }
 
     #[test]

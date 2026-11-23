@@ -44,7 +44,7 @@ bright black `#8b8e9a`. Programs may change them for a while (OSC 4, 10, 11, 12)
 | `TAB_ACCENT_HEIGHT` | 2 | The accent line on top of the active tab |
 | `TAB_CLOSE_SIZE` | 20 | The X of a tab, shown on the active tab and on hover |
 | `BAR_BUTTON_SIZE` | 28 | New tab, agent usage and settings buttons |
-| `TERMINAL_PADDING_X`, `_Y` | 10, 10 | Space around the grid, kitty's `window_padding_width` (board C); the grid is centered in what is left |
+| `TERMINAL_PADDING_X`, `_Y` | 10, 10 | Space around the grid, kitty's `window_padding_width` (board C); the grid is centered across and starts at the top (A4) |
 | `PIXELS_PER_POINT` | 96 / 72 | The terminal font size is in points, as kitty's; rows are the font's own height (ascent plus descent, rounded up) |
 | `CURSOR_THICKNESS` | 2 | Bar and underline cursors |
 
@@ -53,7 +53,8 @@ bright black `#8b8e9a`. Programs may change them for a while (OSC 4, 10, 11, 12)
 - **A1, tabs**: the bar shows the tabs (prompt icon, label, X), the + button with its tooltip
   ("New tab", Ctrl Shift T), and at the right the agent usage and settings buttons, then the
   window controls (Linux and Windows) or the traffic lights at the left (macOS).
-- **A2, one tab**: no bar. A strip of the terminal's color keeps the buttons at the right.
+- **A4, one tab**: the bar always shows, with the single tab (no close button), the new tab
+  button and the profiles chevron, so nothing moves when the second tab opens.
 - **F, Settings**: telaio's Settings dialog. General: theme (Dark, Light, System), font and size,
   cursor (Block, Bar, Underline), paste images, language. About: version, libghostty-vt
   version, privacy line.
@@ -79,7 +80,7 @@ bright black `#8b8e9a`. Programs may change them for a while (OSC 4, 10, 11, 12)
   white underscore, filling the canvas with Postino's corner radius; PNGs and the Windows
   `.ico` generated from it (`packaging/icons/README.md`).
 - **C, resize**: while the grid changes size, the `scrim` with a dashed `accent` frame on
-  `accent_subtle` at 55% over the centered grid, "cols × rows" in the terminal font at 28 and
+  `accent_subtle` at 55% over the grid, "cols × rows" in the terminal font at 28 and
   "Columns × rows. What is left is shared out on both sides" in `accent_text`. It stays 600 ms
   after the last change and fades out in 200 ms.
 - **D, drop overlay**: while files are dragged over a terminal, the `scrim` with a dashed

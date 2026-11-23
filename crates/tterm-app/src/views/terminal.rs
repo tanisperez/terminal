@@ -1017,15 +1017,12 @@ fn grid_cells(area: Size<Pixels>, metrics: CellMetrics) -> (f32, f32) {
     )
 }
 
-/// Where the grid starts in its area: half of what the whole cells leave, in whole pixels.
+/// Where the grid starts in its area: centered across, in whole pixels, and at the top, so the
+/// first line sits under the bar and what the rows leave goes to the bottom (A4, C).
 fn grid_offset(area: Size<Pixels>, metrics: CellMetrics) -> Point<Pixels> {
-    let (cols, rows) = grid_cells(area, metrics);
+    let (cols, _) = grid_cells(area, metrics);
     let spare_x = f32::from(area.width) - cols.max(1.0) * f32::from(metrics.width);
-    let spare_y = f32::from(area.height) - rows.max(1.0) * f32::from(metrics.height);
-    point(
-        px((spare_x / 2.0).max(0.0).floor()),
-        px((spare_y / 2.0).max(0.0).floor()),
-    )
+    point(px((spare_x / 2.0).max(0.0).floor()), px(0.0))
 }
 
 /// What the paint step needs, taken from the view in `render`.
@@ -1052,7 +1049,7 @@ fn paint_grid(data: &PaintData, bounds: Bounds<Pixels>, window: &mut Window, cx:
         ElementInputHandler::new(bounds, data.view.clone()),
         cx,
     );
-    // The grid is centered in its area, as kitty's: what is left of a cell goes half to each side.
+    // The grid is centered across, as kitty's, and starts at the top (A4).
     let origin = bounds.origin + grid_offset(bounds.size, *metrics);
     let cell = |col: u16, row: usize| {
         point(

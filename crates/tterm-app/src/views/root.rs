@@ -1,8 +1,7 @@
 //! The window: the tab bar (also the title bar) and the active terminal below it.
 //!
-//! With one tab there is no bar, as in the design (A2): a strip of the terminal's own color
-//! keeps the agent usage and settings buttons, the window controls and a place to drag the
-//! window from. From the second tab on, the bar shows the tabs (A1, U).
+//! The bar always shows, with one tab too (A4): the new tab button and the profiles are at hand
+//! and nothing moves when the second tab opens. A single tab has no close button (A1, A4, U).
 
 use std::path::PathBuf;
 
@@ -357,42 +356,35 @@ impl AppView {
     }
 
     fn render_bar(&self, palette: &Palette, cx: &mut Context<Self>) -> impl IntoElement {
-        let shows_tabs = self.tabs.shows_bar();
-        let (bar_bg, border) = if shows_tabs {
-            (palette.tab_bar_bg(), palette.tab_bar_border())
-        } else {
-            (palette.terminal_bg(), palette.terminal_bg())
-        };
+        let (bar_bg, border) = (palette.tab_bar_bg(), palette.tab_bar_border());
         let mut row = h_flex().size_full().items_start();
-        if shows_tabs {
-            // Tabs shrink to their minimum; past it the strip clips them and the buttons of the
-            // bar stay in place.
-            let mut strip = h_flex()
-                .items_start()
-                .min_w_0()
-                .flex_shrink(1.0)
-                .overflow_hidden();
-            for (index, tab) in self.tabs.iter().enumerate() {
-                let active = index == self.tabs.active_index();
-                let label = tab.read(cx).label();
-                strip = strip.child(no_drag(self.render_tab(index, label, active, palette, cx)));
-            }
-            row = row.child(strip).child(no_drag(
-                bar_button("new-tab", IconName::Plus, palette)
-                    .ml(px(4.0))
-                    .mt(px(4.0))
-                    .tooltip(|window, cx| {
-                        Tooltip::new(SharedString::from(t!("tabs.new")))
-                            .action(&NewTab, Some(CONTEXT))
-                            .build(window, cx)
-                    })
-                    .on_click(cx.listener(|view, _, window, cx| view.new_tab(&NewTab, window, cx))),
-            ));
-            if self.profiles.has_choice() {
-                row = row.child(no_drag(div().mt(px(4.0)).child(
-                    super::profile_menu::chevron(cx.weak_entity(), self.profiles.clone(), palette),
-                )));
-            }
+        // Tabs shrink to their minimum; past it the strip clips them and the buttons of the
+        // bar stay in place.
+        let mut strip = h_flex()
+            .items_start()
+            .min_w_0()
+            .flex_shrink(1.0)
+            .overflow_hidden();
+        for (index, tab) in self.tabs.iter().enumerate() {
+            let active = index == self.tabs.active_index();
+            let label = tab.read(cx).label();
+            strip = strip.child(no_drag(self.render_tab(index, label, active, palette, cx)));
+        }
+        row = row.child(strip).child(no_drag(
+            bar_button("new-tab", IconName::Plus, palette)
+                .ml(px(4.0))
+                .mt(px(4.0))
+                .tooltip(|window, cx| {
+                    Tooltip::new(SharedString::from(t!("tabs.new")))
+                        .action(&NewTab, Some(CONTEXT))
+                        .build(window, cx)
+                })
+                .on_click(cx.listener(|view, _, window, cx| view.new_tab(&NewTab, window, cx))),
+        ));
+        if self.profiles.has_choice() {
+            row = row.child(no_drag(div().mt(px(4.0)).child(
+                super::profile_menu::chevron(cx.weak_entity(), self.profiles.clone(), palette),
+            )));
         }
         row = row.child(div().flex_1());
         if let Some(update) = self.render_update_button(palette, cx) {
@@ -441,6 +433,7 @@ impl AppView {
     ) -> impl IntoElement {
         let (hover, pressed) = (palette.hover, palette.pressed);
         let group = SharedString::from(format!("tab-{index}"));
+        let closable = self.tabs.closable();
         let close = div()
             .id(("tab-close", index))
             .size(px(TAB_CLOSE_SIZE))
@@ -511,10 +504,12 @@ impl AppView {
                 }
             })
             .on_click(cx.listener(move |view, _, window, cx| view.activate(index, window, cx)))
-            .on_mouse_up(
-                MouseButton::Middle,
-                cx.listener(move |view, _, window, cx| view.close_tab_at(index, window, cx)),
-            )
+            .when(closable, |tab| {
+                tab.on_mouse_up(
+                    MouseButton::Middle,
+                    cx.listener(move |view, _, window, cx| view.close_tab_at(index, window, cx)),
+                )
+            })
             .child(
                 Icon::new(IconName::Terminal)
                     .with_size(px(TAB_ICON_SIZE))
@@ -534,7 +529,7 @@ impl AppView {
                     .whitespace_nowrap()
                     .child(label),
             )
-            .child(close)
+            .when(closable, |tab| tab.child(close))
     }
 }
 
