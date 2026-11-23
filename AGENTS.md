@@ -36,6 +36,13 @@ Expo/React Native conventions here.
   download a prebuilt static library. The handles are `!Send`: the emulator lives on the window's
   thread.
 - Pseudo terminal: `portable-pty` (WezTerm's, MIT): Unix pty and Windows ConPTY.
+- Shell integration (#10): bash, zsh and fish load Ghostty's scripts (shipped by `ghostty-vt`,
+  written to a cache folder), injected as Ghostty does: zsh through `ZDOTDIR`, bash with
+  `--posix` and `ENV`, fish through `XDG_DATA_DIRS` (`tterm-term/src/integration.rs`). They
+  report the folder (OSC 7, `kitty-shell-cwd://`) and the prompts (OSC 133).
+  `GHOSTTY_SHELL_FEATURES` is empty: tterm names its tabs and draws its cursor itself. A new
+  tab starts in the active tab's folder, from OSC 7 or, on Linux, the foreground program's
+  folder in `/proc`. Not on Windows, where WSL runs its own shells.
 - Programs see `TERM=xterm-ghostty` with Ghostty's terminfo (written to a cache folder by
   `ghostty_vt::terminfo::dir`), `COLORTERM=truecolor` and `TERM_PROGRAM=tterm`.
 - Languages of the UI: **English** (source and fallback) and **Spanish**, as ted.

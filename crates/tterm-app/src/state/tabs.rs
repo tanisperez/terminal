@@ -125,14 +125,22 @@ pub fn folder_name(path: &std::path::Path, home: Option<&std::path::Path>) -> St
         .unwrap_or_else(|| path.display().to_string())
 }
 
-/// The folder of an OSC 7 report (`file://host/path`), as a path. Other forms are taken as a
-/// plain path.
+/// The folder of an OSC 7 report, as a path: `file://host/path` (percent encoded), or
+/// `kitty-shell-cwd://host/path` (raw, as Ghostty's shell integration sends it). Other forms
+/// are taken as a plain path.
 pub fn pwd_path(report: &str) -> std::path::PathBuf {
-    let rest = report.strip_prefix("file://").map(|rest| {
-        // Skip the host: the path starts at the first slash after it.
-        rest.find('/').map_or(rest, |slash| &rest[slash..])
-    });
-    std::path::PathBuf::from(percent_decode(rest.unwrap_or(report)))
+    // Skip the host: the path starts at the first slash after it.
+    let path_of = |rest: &str| {
+        rest.find('/')
+            .map_or(String::new(), |slash| rest[slash..].to_string())
+    };
+    if let Some(rest) = report.strip_prefix("kitty-shell-cwd://") {
+        return std::path::PathBuf::from(path_of(rest));
+    }
+    if let Some(rest) = report.strip_prefix("file://") {
+        return std::path::PathBuf::from(percent_decode(&path_of(rest)));
+    }
+    std::path::PathBuf::from(report)
 }
 
 fn percent_decode(text: &str) -> String {
@@ -242,5 +250,9 @@ mod tests {
             Path::new("/home/me/my dev")
         );
         assert_eq!(pwd_path("/tmp"), Path::new("/tmp"));
+        assert_eq!(
+            pwd_path("kitty-shell-cwd://thinkpad/home/me/dev/my%20dir"),
+            Path::new("/home/me/dev/my%20dir")
+        );
     }
 }

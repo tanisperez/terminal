@@ -198,9 +198,7 @@ impl AppView {
 
     /// The folder a new tab starts in: the one the active shell reported, or the home folder.
     fn new_tab_folder(&self, cx: &App) -> Option<PathBuf> {
-        self.tabs
-            .active()
-            .and_then(|tab| tab.read(cx).cwd().map(PathBuf::from))
+        self.tabs.active().and_then(|tab| tab.read(cx).cwd())
     }
 
     fn new_tab(&mut self, _: &NewTab, window: &mut Window, cx: &mut Context<Self>) {

@@ -7,7 +7,7 @@
 //! quiet: no timer, no polling, a steady cursor.
 
 use std::io::Read as _;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use gpui_kit::component::WindowExt as _;
 use gpui_kit::prelude::*;
@@ -113,12 +113,17 @@ impl TerminalView {
             Err(error) => panic!("could not create the terminal: {error}"),
         };
         let cwd = profile.and_then(|profile| profile.cwd.clone()).or(cwd);
-        let options = SpawnOptions {
+        // Ghostty's shell integration: the shell reports its folder and its prompts (#10).
+        let launch = tterm_term::integration::for_this_system(tterm_term::integration::Launch {
             command: profile
                 .map(|profile| profile.command.iter().map(Into::into).collect())
                 .unwrap_or_default(),
-            cwd: cwd.clone(),
             env: pty::terminal_env(tterm_cli::IDENTITY.version),
+        });
+        let options = SpawnOptions {
+            command: launch.command,
+            cwd: cwd.clone(),
+            env: launch.env,
             cols: size.cols,
             rows: size.rows,
         };
@@ -232,9 +237,16 @@ impl TerminalView {
         })
     }
 
-    /// The folder the shell is in, as last reported, for a new tab to start there.
-    pub fn cwd(&self) -> Option<&Path> {
-        self.cwd.as_deref()
+    /// The folder the shell is in, for a new tab to start there: as the shell reported it
+    /// (OSC 7, from the shell integration), or else the folder of the program in the
+    /// foreground (Linux).
+    pub fn cwd(&self) -> Option<PathBuf> {
+        self.cwd.clone().or_else(|| {
+            self.pty
+                .as_ref()
+                .and_then(Pty::foreground)
+                .and_then(|foreground| foreground.cwd)
+        })
     }
 
     /// Applies changed settings: the font, its size, the cursor and the colors.

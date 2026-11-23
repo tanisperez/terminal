@@ -13,6 +13,7 @@
 
 mod emulator;
 pub mod frame;
+pub mod integration;
 pub mod key;
 pub mod pty;
 
