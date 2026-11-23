@@ -17,8 +17,7 @@ use telaio_ui::components::{
 
 use crate::state::locale::{LANGUAGES, LanguageChoice};
 use crate::state::settings::{
-    CursorChoice, DEFAULT_FONT, FONT_SIZE_RANGE, FONT_SIZE_STEP, Settings, ThemeChoice,
-    settings_path,
+    CursorChoice, FONT_SIZE_RANGE, FONT_SIZE_STEP, Settings, ThemeChoice, settings_path,
 };
 use crate::theme::metrics::CONTROL_HEIGHT;
 use crate::theme::{Palette, PaletteExt as _};
@@ -28,11 +27,8 @@ use super::root::AppView;
 /// Width of the font select.
 const FONT_SELECT_WIDTH: f32 = 188.0;
 
-/// Monospace fonts offered when they are installed, after the bundled default.
-const KNOWN_FONTS: [&str; 10] = [
-    "Cascadia Code",
-    "JetBrains Mono",
-    "Fira Code",
+/// Monospace fonts offered when they are installed, after the bundled ones.
+const KNOWN_FONTS: [&str; 7] = [
     "Source Code Pro",
     "Ubuntu Mono",
     "DejaVu Sans Mono",
@@ -84,7 +80,10 @@ pub fn open(weak: WeakEntity<AppView>, window: &mut Window, cx: &mut App) {
     }
     // The fonts installed are read once per opening, not on every frame.
     let installed = cx.text_system().all_font_names();
-    let mut fonts = vec![DEFAULT_FONT.to_string()];
+    let mut fonts: Vec<String> = crate::theme::fonts::BUNDLED
+        .iter()
+        .map(|font| font.to_string())
+        .collect();
     fonts.extend(
         KNOWN_FONTS
             .iter()

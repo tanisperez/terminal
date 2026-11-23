@@ -75,10 +75,12 @@ bright black `#8b8e9a`. Programs may change them for a while (OSC 4, 10, 11, 12)
   Enter, a number, Esc, and the hints bar of telaio's modals.
 - Tab labels: a user's profile is named by the profile; others by the program's title (a
   title that is a program path is ignored), or the shell and its folder.
-- Still to build: D (the drop overlay), T (bundled fonts), G (the icon).
+- Still to build: D (the drop overlay), G (the icon).
 
 ## Typography
 
 - Interface: Geist 13 from telaio.
-- Terminal: the `font` setting, Geist Mono 13 by default. The design's default is Cascadia
-  Code, bundled with JetBrains Mono, Fira Code and Geist Mono (board T); pending.
+- Terminal: the `font` setting, Cascadia Code 13 by default, as board T. Cascadia Code,
+  JetBrains Mono and Fira Code are bundled (`theme/fonts.rs`, OFL 1.1), Geist Mono comes from
+  telaio; the select lists them first, then the known monospace fonts installed. Ligatures are
+  on.

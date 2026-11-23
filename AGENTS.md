@@ -75,8 +75,6 @@ Expo/React Native conventions here.
 
 ## Pending decisions (ask before choosing)
 
-- Fonts: board T bundles JetBrains Mono, Cascadia Code (the default), Fira Code and Geist Mono.
-  Only Geist Mono (from telaio) is bundled today; the others are offered when installed.
 - Agents other than Claude Code in the usage screen.
 - Environment variables per profile.
 - Splits: not in the design; ask before designing them.

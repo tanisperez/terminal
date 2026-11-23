@@ -1,6 +1,7 @@
 //! tterm's visual foundations, on top of telaio: the palette (telaio's default tokens, whose
 //! dark accent is the indigo of the design), the terminal colors and the layout metrics.
 
+pub mod fonts;
 pub mod metrics;
 pub mod palette;
 
@@ -15,6 +16,7 @@ use crate::state::settings::Settings;
 /// Loads the tterm Light/Dark theme family and makes it the registry's default light and dark
 /// themes. Call once, before opening any window.
 pub fn install(cx: &mut App, settings: &Settings) {
+    fonts::register(cx);
     telaio_ui::install(cx, &theme_family(settings));
 }
 
