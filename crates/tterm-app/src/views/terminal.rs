@@ -12,7 +12,9 @@ use std::path::{Path, PathBuf};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 use tterm_term::pty::{self, Pty, SpawnOptions};
-use tterm_term::{CursorShape, Effect, Emulator, Frame, GridSize, KeyInput, Modifiers};
+use tterm_term::{
+    CursorShape, Effect, Emulator, Frame, GridSize, KeyInput, Modifiers, SelectionUnit,
+};
 
 use crate::actions::{Copy, Paste};
 use crate::state::settings::Settings;
@@ -62,6 +64,11 @@ pub struct TerminalView {
     cwd: Option<PathBuf>,
     /// Lines of a smooth scroll (a touchpad) not scrolled yet.
     scroll_rest: f32,
+    /// The top left corner of the grid in the window, from the last layout, to turn mouse
+    /// positions into cells.
+    grid_origin: Point<Pixels>,
+    /// Whether the left button is down over the grid, extending the selection as it moves.
+    selecting: bool,
     _output: Task<()>,
 }
 
@@ -102,6 +109,8 @@ impl TerminalView {
             shell: crate::state::shell::shell_name(),
             cwd,
             scroll_rest: 0.0,
+            grid_origin: Point::default(),
+            selecting: false,
             _output: Task::ready(()),
         };
         match pty::spawn(&options) {
@@ -326,8 +335,84 @@ impl TerminalView {
         self.send_input(&bytes, cx);
     }
 
-    fn copy(&mut self, _: &Copy, _: &mut Window, _: &mut Context<Self>) {
-        // Selecting text with the mouse is not built yet; Copy has nothing to copy.
+    fn copy(&mut self, _: &Copy, _: &mut Window, cx: &mut Context<Self>) {
+        match self.emulator.selection_text() {
+            Ok(Some(text)) => cx.write_to_clipboard(ClipboardItem::new_string(text)),
+            Ok(None) => {}
+            Err(error) => log::debug!("selection not read: {error}"),
+        }
+    }
+
+    /// The visible cell under a window position, clamped to the grid.
+    fn cell_at(&self, position: Point<Pixels>) -> Option<(u16, u16)> {
+        let (_, _, metrics) = self.metrics.as_ref()?;
+        let size = self.emulator.size();
+        let x = f32::from(position.x - self.grid_origin.x) / f32::from(metrics.width);
+        let y = f32::from(position.y - self.grid_origin.y) / f32::from(metrics.height);
+        let col = x.floor().clamp(0.0, f32::from(size.cols - 1)) as u16;
+        let row = y.floor().clamp(0.0, f32::from(size.rows - 1)) as u16;
+        Some((col, row))
+    }
+
+    fn on_mouse_down(
+        &mut self,
+        event: &MouseDownEvent,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.focus.focus(window, cx);
+        let Some((col, row)) = self.cell_at(event.position) else {
+            return;
+        };
+        let unit = match event.click_count {
+            0 | 1 => SelectionUnit::Cell,
+            2 => SelectionUnit::Word,
+            _ => SelectionUnit::Line,
+        };
+        log::trace!("press at cell {col},{row}, {} clicks", event.click_count);
+        if let Err(error) = self.emulator.select_start(col, row, unit) {
+            log::debug!("selection not started: {error}");
+        }
+        self.selecting = unit == SelectionUnit::Cell;
+        self.refresh_frame();
+        cx.notify();
+    }
+
+    fn on_mouse_move(&mut self, event: &MouseMoveEvent, cx: &mut Context<Self>) {
+        if !self.selecting || event.pressed_button != Some(MouseButton::Left) {
+            return;
+        }
+        let Some((col, row)) = self.cell_at(event.position) else {
+            return;
+        };
+        if let Err(error) = self.emulator.select_to(col, row) {
+            log::debug!("selection not extended: {error}");
+        }
+        let generation = self.frame.generation;
+        self.refresh_frame();
+        if self.frame.generation != generation {
+            cx.notify();
+        }
+    }
+
+    fn on_mouse_up(&mut self, cx: &mut Context<Self>) {
+        self.selecting = false;
+        // On Linux the selection is also the primary selection, pasted with the middle button.
+        #[cfg(target_os = "linux")]
+        if let Ok(Some(text)) = self.emulator.selection_text() {
+            cx.write_to_primary(ClipboardItem::new_string(text));
+        }
+        #[cfg(not(target_os = "linux"))]
+        let _ = cx;
+    }
+
+    /// Pastes the primary selection, as the middle button does in X11 and Wayland terminals.
+    #[cfg(target_os = "linux")]
+    fn paste_primary(&mut self, cx: &mut Context<Self>) {
+        if let Some(text) = cx.read_from_primary().and_then(|item| item.text()) {
+            let bytes = self.emulator.encode_paste(&text);
+            self.send_input(&bytes, cx);
+        }
     }
 
     /// Paths dropped from a file manager are typed, quoted, as most terminals do (design D).
@@ -379,6 +464,7 @@ impl TerminalView {
             cell_width_px: f32::from(metrics.width).round() as u32,
             cell_height_px: f32::from(metrics.height).round() as u32,
         };
+        self.grid_origin = bounds.origin;
         if size == self.emulator.size() {
             return;
         }
@@ -413,6 +499,7 @@ impl Render for TerminalView {
             family: self.font_family.clone(),
             focused: self.focus.is_focused(window),
             indicator: palette.fg_subtle.opacity(0.5),
+            selection: palette.accent_subtle,
         };
         let view = cx.weak_entity();
         div()
@@ -427,8 +514,26 @@ impl Render for TerminalView {
             .on_scroll(cx.listener(|view, event, _, cx| view.on_scroll(event, cx)))
             .on_mouse_down(
                 MouseButton::Left,
-                cx.listener(|view, _, window, cx| view.focus.focus(window, cx)),
+                cx.listener(|view, event, window, cx| view.on_mouse_down(event, window, cx)),
             )
+            .on_mouse_move(cx.listener(|view, event, _, cx| view.on_mouse_move(event, cx)))
+            .on_mouse_up(
+                MouseButton::Left,
+                cx.listener(|view, _, _, cx| view.on_mouse_up(cx)),
+            )
+            .on_mouse_up_out(
+                MouseButton::Left,
+                cx.listener(|view, _, _, cx| view.on_mouse_up(cx)),
+            )
+            .when(cfg!(target_os = "linux"), |area| {
+                area.on_mouse_up(
+                    MouseButton::Middle,
+                    cx.listener(|_view, _, _, _cx| {
+                        #[cfg(target_os = "linux")]
+                        _view.paste_primary(_cx);
+                    }),
+                )
+            })
             .on_action(cx.listener(Self::paste))
             .on_action(cx.listener(Self::copy))
             .on_drop(
@@ -454,6 +559,7 @@ struct PaintData {
     family: SharedString,
     focused: bool,
     indicator: Hsla,
+    selection: Hsla,
 }
 
 fn paint_grid(data: &PaintData, bounds: Bounds<Pixels>, window: &mut Window, cx: &mut App) {
@@ -467,6 +573,15 @@ fn paint_grid(data: &PaintData, bounds: Bounds<Pixels>, window: &mut Window, cx:
     };
     let regular = font(data.family.clone());
     for (row, line) in frame.lines.iter().enumerate() {
+        if let Some((start, end)) = line.selection {
+            window.paint_quad(fill(
+                Bounds::new(
+                    cell(start, row),
+                    size(metrics.width * f32::from(end + 1 - start), metrics.height),
+                ),
+                data.selection,
+            ));
+        }
         for span in &line.backgrounds {
             window.paint_quad(fill(
                 Bounds::new(

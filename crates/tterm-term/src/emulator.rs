@@ -8,8 +8,10 @@ use std::sync::Arc;
 
 use ghostty_vt::render::{CellIterator, CursorVisualStyle, Dirty, RowIterator};
 use ghostty_vt::screen::CellWide;
+use ghostty_vt::screen::TrackedGridRef;
+use ghostty_vt::selection::{FormatOptions, SelectLineOptions, SelectWordOptions, Selection};
 use ghostty_vt::style::{Palette, RgbColor, Underline};
-use ghostty_vt::terminal::{CursorStyle, Mode, ScrollViewport};
+use ghostty_vt::terminal::{CursorStyle, Mode, Point, PointCoordinate, ScrollViewport};
 use ghostty_vt::{RenderState, Terminal, TerminalOptions, key};
 
 use crate::frame::{BgSpan, Cursor, CursorShape, Frame, Line, Rgb, Run, ScrollState};
@@ -107,6 +109,19 @@ pub struct Emulator {
     key_event: key::Event,
     frame: Frame,
     size: GridSize,
+    /// Where a mouse selection started, kept by libghostty-vt as the screen scrolls.
+    anchor: Option<TrackedGridRef>,
+}
+
+/// How a selection grows from where the mouse was pressed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SelectionUnit {
+    /// Cell by cell (a single click).
+    Cell,
+    /// Whole words (a double click).
+    Word,
+    /// Whole lines (a triple click).
+    Line,
 }
 
 impl Emulator {
@@ -138,6 +153,7 @@ impl Emulator {
             key_event: key::Event::new()?,
             frame: Frame::default(),
             size,
+            anchor: None,
         };
         emulator.set_colors(colors)?;
         emulator.set_cursor_style(cursor)?;
@@ -318,6 +334,62 @@ impl Emulator {
         }
     }
 
+    /// Starts a selection at a visible cell: a single click remembers where it started and
+    /// clears the old selection, a double click selects the word and a triple click the line.
+    pub fn select_start(&mut self, col: u16, row: u16, unit: SelectionUnit) -> Result<(), Error> {
+        let point = viewport_point(col, row);
+        self.anchor = None;
+        match unit {
+            SelectionUnit::Cell => {
+                self.terminal.set_selection(None)?;
+                self.anchor = Some(self.terminal.track_grid_ref(point)?);
+            }
+            SelectionUnit::Word => {
+                let at = self.terminal.grid_ref(point)?;
+                let word = self.terminal.select_word(SelectWordOptions::new(at))?;
+                self.terminal.set_selection(word.as_ref())?;
+            }
+            SelectionUnit::Line => {
+                let at = self.terminal.grid_ref(point)?;
+                let line = self.terminal.select_line(SelectLineOptions::new(at))?;
+                self.terminal.set_selection(line.as_ref())?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Extends a cell selection to a visible cell, as the mouse drags.
+    pub fn select_to(&mut self, col: u16, row: u16) -> Result<(), Error> {
+        let Some(anchor) = self.anchor.as_ref() else {
+            return Ok(());
+        };
+        let Some(start) = anchor.snapshot(&self.terminal)? else {
+            return Ok(());
+        };
+        let end = self.terminal.grid_ref(viewport_point(col, row))?;
+        let selection = Selection::new(start, end, false);
+        self.terminal.set_selection(Some(&selection))?;
+        Ok(())
+    }
+
+    /// Clears the selection.
+    pub fn clear_selection(&mut self) -> Result<(), Error> {
+        self.anchor = None;
+        self.terminal.set_selection(None)?;
+        Ok(())
+    }
+
+    /// The selected text, lines joined as the program wrote them and trailing spaces trimmed,
+    /// `None` without a selection.
+    pub fn selection_text(&self) -> Result<Option<String>, Error> {
+        let options = FormatOptions::new().with_unwrap(true).with_trim(true);
+        Ok(self
+            .terminal
+            .format_selection_alloc(options)?
+            .map(|bytes| String::from_utf8_lossy(&bytes).into_owned())
+            .filter(|text| !text.is_empty()))
+    }
+
     /// The current frame. Rebuilds only the rows that changed since the last call, so calling
     /// it when nothing changed costs one query.
     pub fn frame(&mut self) -> Result<&Frame, Error> {
@@ -389,7 +461,9 @@ impl Emulator {
                                 invisible: style.invisible,
                             });
                         }
-                        builder.finish()
+                        let mut line = builder.finish();
+                        line.selection = row.selection()?.map(|range| (range.start_x, range.end_x));
+                        line
                     };
                     lines[y] = Arc::new(line);
                 }
@@ -551,6 +625,13 @@ impl LineBuilder {
         self.trim_last();
         self.line
     }
+}
+
+fn viewport_point(col: u16, row: u16) -> Point {
+    Point::Viewport(PointCoordinate {
+        x: col,
+        y: u32::from(row),
+    })
 }
 
 fn from_vt(color: RgbColor) -> Rgb {
@@ -751,6 +832,41 @@ mod tests {
         assert_eq!(
             term.encode_key(&KeyInput::named("up", Modifiers::NONE)),
             b"\x1bOA"
+        );
+    }
+
+    #[test]
+    fn a_dragged_selection_is_shown_and_copied() {
+        let mut term = emulator(20, 3);
+        term.feed(b"hello world\r\nsecond line");
+        term.frame().unwrap();
+        term.select_start(6, 0, SelectionUnit::Cell).unwrap();
+        term.select_to(5, 1).unwrap();
+        let frame = term.frame().unwrap();
+        assert_eq!(frame.lines[0].selection, Some((6, 19)));
+        assert_eq!(frame.lines[1].selection, Some((0, 5)));
+        assert_eq!(frame.lines[2].selection, None);
+        assert_eq!(
+            term.selection_text().unwrap().as_deref(),
+            Some("world\nsecond")
+        );
+        term.clear_selection().unwrap();
+        assert_eq!(term.frame().unwrap().lines[0].selection, None);
+        assert_eq!(term.selection_text().unwrap(), None);
+    }
+
+    #[test]
+    fn a_double_click_selects_a_word_and_a_triple_click_the_line() {
+        let mut term = emulator(30, 2);
+        term.feed(b"cargo build --release");
+        term.frame().unwrap();
+        term.select_start(8, 0, SelectionUnit::Word).unwrap();
+        assert_eq!(term.selection_text().unwrap().as_deref(), Some("build"));
+        assert_eq!(term.frame().unwrap().lines[0].selection, Some((6, 10)));
+        term.select_start(8, 0, SelectionUnit::Line).unwrap();
+        assert_eq!(
+            term.selection_text().unwrap().as_deref(),
+            Some("cargo build --release")
         );
     }
 

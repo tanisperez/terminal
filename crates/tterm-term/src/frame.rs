@@ -77,6 +77,8 @@ pub struct Line {
     pub runs: Vec<Run>,
     /// The background spans, left to right.
     pub backgrounds: Vec<BgSpan>,
+    /// The selected columns of the line, both inclusive, when part of it is selected.
+    pub selection: Option<(u16, u16)>,
 }
 
 impl Line {
@@ -201,6 +203,7 @@ mod tests {
         let line = Line {
             runs: vec![run(0, "ab"), run(4, "cd  ")],
             backgrounds: Vec::new(),
+            selection: None,
         };
         assert_eq!(line.text(), "ab  cd");
     }
