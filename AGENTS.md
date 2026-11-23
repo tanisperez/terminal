@@ -51,7 +51,8 @@ Expo/React Native conventions here.
   design system). UI changes are designed there first; read its boards with the Artifact tool,
   never a local copy. Boards: A1 tabs, A2 one tab without a bar, D dropping a screenshot, E a
   screenshot pasted into Claude Code, F settings, H2 agent usage, W1/W2 Windows profiles, M1 macOS
-  profiles, P1 profile settings, U the bar on the three platforms, T fonts, G the icon.
+  profiles, P1 profile settings, U the bar on the three platforms, T fonts, G the icon, R the
+  update ready in the bar and its restart dialog.
 - The tab bar is the title bar and only shows from the second tab (A2, U). With one tab, a strip
   of the terminal's color keeps the usage and settings buttons, the window controls and the drag
   area.
@@ -68,6 +69,13 @@ Expo/React Native conventions here.
   screen opens. Only the usage lines are read, never the content. Input tokens include the cache
   (creation and reads), with the breakdown in the tooltip. Open sessions are the tabs running
   `claude`.
+- Packaging and updates (#11, decided on 2026-11-23): copied from ted (`docs/releasing.md`).
+  The Linux packages are named `tterm`, as the binary. The macOS bundle is `tterm.app`, shown as
+  Tanis Terminal, and `telaio-update`'s `app_name` is `tterm`, so its folders match the
+  binary's (`tterm/updates` in the cache). The Windows installer is per user in
+  `%LOCALAPPDATA%\Programs\tterm`, with "Open in Tanis Terminal" on folders. No document types
+  or MIME types: a terminal opens folders, not files. The update button sits in the bar before
+  the usage button (design R), and restarting always asks first, since it closes every tab.
 - Profiles (#5, decided on 2026-11-23) live in `settings.toml`: detected profiles are not
   written; the user's own ones are `[[profiles]]` tables (`name`, `shell`, `cwd`, `startup`,
   `color`, `shortcut`), plus `default_profile` and `hidden_profiles`. `startup` is typed into the
@@ -87,7 +95,7 @@ depends on `tterm-app`:
 ```
 tterm-app ──> tterm-term ──> ghostty-vt, portable-pty
    ├────────> tterm-usage (agent logs, standalone)
-   ├────────> telaio-ui, telaio-app
+   ├────────> telaio-ui, telaio-app, telaio-update
    └────────> tterm-cli (standalone, depends on no other tterm crate)
 ```
 
@@ -143,7 +151,8 @@ The shared rules (section 8) apply in full. On top of that, for tterm:
   `tterm-app`'s Cargo.toml); without it they are read from the build machine's disk and every
   icon is empty in the VM.
 - Debug hooks, read once at startup: `TTERM_LOG=<level>`, `TTERM_OPEN=<state>` (`settings`,
-  `settings-profiles`, `settings-about`, `usage`).
+  `settings-profiles`, `settings-about`, `usage`), `TTERM_UPDATE_URL=<latest.json>` (in a build
+  made with `TTERM_UPDATER=github`, checks this manifest instead of GitHub's).
 
 ## Working rules
 
