@@ -1,0 +1,17 @@
+# The drop overlay (design D).
+_version: 2
+"drop.title_image":
+  en: "Drop to paste the image"
+  es: "Suelta para pegar la imagen"
+"drop.title_path":
+  en: "Drop to paste the path"
+  es: "Suelta para pegar la ruta"
+"drop.subtitle":
+  en: "The path is typed on the command line"
+  es: "Se escribe la ruta en la línea de comandos"
+"drop.files.one":
+  en: "%{count} file"
+  es: "%{count} archivo"
+"drop.files.other":
+  en: "%{count} files"
+  es: "%{count} archivos"

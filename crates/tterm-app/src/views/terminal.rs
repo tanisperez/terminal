@@ -19,6 +19,7 @@ use tterm_term::{
 };
 
 use crate::actions::{Copy, Paste};
+use crate::state::drop::{DropPreview, size_label};
 use crate::state::profiles::{Origin, Profile};
 use crate::state::settings::Settings;
 use crate::theme::metrics::{
@@ -36,6 +37,9 @@ const MAX_BATCH_BYTES: usize = 1 << 20;
 const CHANNEL_CHUNKS: usize = 64;
 /// How long the shell must be quiet before a profile's start command is typed.
 const STARTUP_QUIET: std::time::Duration = std::time::Duration::from_millis(500);
+/// The thumbnail of a dropped image (design D).
+const DROP_THUMBNAIL_WIDTH: f32 = 224.0;
+const DROP_THUMBNAIL_HEIGHT: f32 = 140.0;
 /// How much the reader reads at once.
 const READ_BUFFER: usize = 64 * 1024;
 
@@ -79,6 +83,10 @@ pub struct TerminalView {
     cwd: Option<PathBuf>,
     /// Lines of a smooth scroll (a touchpad) not scrolled yet.
     scroll_rest: f32,
+    /// How the shell reads a typed path (dropped files, pasted images).
+    shell_kind: crate::state::shell::ShellKind,
+    /// The files being dragged over the terminal, for the drop overlay.
+    drop_preview: Option<DropPreview>,
     /// Text an input method is composing (a dead key, an IME), not sent yet.
     preedit: Option<String>,
     /// The top left corner of the grid in the window, from the last layout, to turn mouse
@@ -148,6 +156,12 @@ impl TerminalView {
                 .map(|profile| profile.name.clone()),
             cwd,
             scroll_rest: 0.0,
+            drop_preview: None,
+            shell_kind: crate::state::shell::ShellKind::of(
+                profile
+                    .map(|profile| profile.command.as_slice())
+                    .unwrap_or(&[]),
+            ),
             preedit: None,
             paste_images: settings.paste_images,
             grid_origin: Point::default(),
@@ -522,7 +536,7 @@ impl TerminalView {
         match saved {
             Ok(path) => {
                 log::info!("pasted an image of {} bytes", bytes.len());
-                let quoted = crate::state::shell::quote(&path.to_string_lossy());
+                let quoted = self.shell_kind.path(&path.to_string_lossy());
                 let input = self.emulator.encode_paste(&format!("{quoted} "));
                 self.send_input(&input, cx);
                 window.push_notification(
@@ -691,7 +705,7 @@ impl TerminalView {
         let text = paths
             .paths()
             .iter()
-            .map(|path| crate::state::shell::quote(&path.to_string_lossy()))
+            .map(|path| self.shell_kind.path(&path.to_string_lossy()))
             .collect::<Vec<_>>()
             .join(" ");
         if text.is_empty() {
@@ -776,9 +790,18 @@ impl Render for TerminalView {
             focus: self.focus.clone(),
         };
         let view = cx.weak_entity();
+        // The drop overlay shows only while files are being dragged (design D).
+        if !cx.has_active_drag() {
+            self.drop_preview = None;
+        }
+        let overlay = self
+            .drop_preview
+            .as_ref()
+            .map(|preview| drop_overlay(preview, &palette));
         div()
             .id("terminal")
             .track_focus(&self.focus)
+            .relative()
             .size_full()
             .bg(rgb(self.frame.background))
             .px(px(TERMINAL_PADDING_X))
@@ -817,8 +840,25 @@ impl Render for TerminalView {
             )
             .on_action(cx.listener(Self::paste))
             .on_action(cx.listener(Self::copy))
-            .on_drop(
-                cx.listener(|view, paths: &ExternalPaths, _, cx| view.on_drop_paths(paths, cx)),
+            .on_drop(cx.listener(|view, paths: &ExternalPaths, _, cx| {
+                view.drop_preview = None;
+                view.on_drop_paths(paths, cx)
+            }))
+            .on_drag_move(
+                cx.listener(|view, event: &DragMoveEvent<ExternalPaths>, _, cx| {
+                    let over = event.bounds.contains(&event.event.position);
+                    let paths = event.drag(cx).paths();
+                    let same = view
+                        .drop_preview
+                        .as_ref()
+                        .is_some_and(|preview| preview.paths.as_slice() == paths);
+                    if over && !same {
+                        view.drop_preview = Some(DropPreview::read(paths));
+                        cx.notify();
+                    } else if !over && view.drop_preview.take().is_some() {
+                        cx.notify();
+                    }
+                }),
             )
             .child(
                 canvas(
@@ -830,6 +870,7 @@ impl Render for TerminalView {
                 )
                 .size_full(),
             )
+            .children(overlay)
     }
 }
 
@@ -1188,4 +1229,85 @@ fn mods_of(modifiers: gpui_kit::Modifiers) -> Modifiers {
         shift: modifiers.shift,
         platform: modifiers.platform,
     }
+}
+
+/// The overlay of design D: the files about to be dropped and what dropping does.
+fn drop_overlay(preview: &DropPreview, palette: &crate::theme::Palette) -> AnyElement {
+    let name = preview
+        .name()
+        .unwrap_or_else(|| crate::state::locale::plural("drop.files", preview.paths.len()));
+    let mut details = Vec::new();
+    if preview.paths.len() == 1 {
+        if let Some(size) = preview.size {
+            details.push(size_label(size));
+        }
+        if let Some((width, height)) = preview.dimensions {
+            details.push(format!("{width}\u{d7}{height}"));
+        }
+    }
+    let title = if preview.image().is_some() {
+        rust_i18n::t!("drop.title_image")
+    } else {
+        rust_i18n::t!("drop.title_path")
+    };
+    let thumbnail = preview.image().map(|path| {
+        img(path.to_path_buf())
+            .w(px(DROP_THUMBNAIL_WIDTH))
+            .h(px(DROP_THUMBNAIL_HEIGHT))
+            .object_fit(ObjectFit::Contain)
+            .rounded(px(10.0))
+    });
+    div()
+        .absolute()
+        .top_0()
+        .left_0()
+        .size_full()
+        .p(px(16.0))
+        .bg(palette.scrim)
+        .child(
+            gpui_kit::component::v_flex()
+                .size_full()
+                .items_center()
+                .justify_center()
+                .gap(px(16.0))
+                .rounded(px(10.0))
+                .border_1()
+                .border_dashed()
+                .border_color(palette.accent)
+                .bg(palette.accent_subtle.opacity(0.55))
+                .children(thumbnail)
+                .child(
+                    gpui_kit::component::v_flex()
+                        .items_center()
+                        .gap(px(4.0))
+                        .child(div().text_size(px(12.0)).text_color(palette.fg).child(name))
+                        .when(!details.is_empty(), |column| {
+                            column.child(
+                                div()
+                                    .text_size(px(12.0))
+                                    .text_color(palette.fg_muted)
+                                    .child(details.join(" \u{b7} ")),
+                            )
+                        }),
+                )
+                .child(
+                    gpui_kit::component::v_flex()
+                        .items_center()
+                        .gap(px(6.0))
+                        .child(
+                            div()
+                                .text_size(px(15.0))
+                                .font_weight(FontWeight::SEMIBOLD)
+                                .text_color(palette.fg)
+                                .child(title),
+                        )
+                        .child(
+                            div()
+                                .text_size(px(12.5))
+                                .text_color(palette.accent_text)
+                                .child(rust_i18n::t!("drop.subtitle")),
+                        ),
+                ),
+        )
+        .into_any_element()
 }

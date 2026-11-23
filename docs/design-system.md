@@ -78,7 +78,11 @@ bright black `#8b8e9a`. Programs may change them for a while (OSC 4, 10, 11, 12)
 - **G, icon**: `packaging/icons/tterm.svg`, the black square with the indigo prompt and the
   white underscore, filling the canvas with Postino's corner radius; PNGs and the Windows
   `.ico` generated from it (`packaging/icons/README.md`).
-- Still to build: D (the drop overlay).
+- **D, drop overlay**: while files are dragged over a terminal, the `scrim` with a dashed
+  `accent` frame on `accent_subtle` at 55%, the image's thumbnail (224 x 140), its name, size
+  and a PNG's dimensions, "Drop to paste the image" (or the path) and "The path is typed on the
+  command line" in `accent_text`. Dropping types the paths as the tab's shell reads them: single
+  quotes for POSIX shells, `/mnt/<drive>/...` in WSL, double quotes in cmd and PowerShell.
 
 ## Typography
 
