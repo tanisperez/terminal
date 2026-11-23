@@ -137,6 +137,9 @@ The shared rules (section 8) apply in full. On top of that, for tterm:
   frame with one changed row costs one new line.
 - Text is shaped per run with gpui's line cache and a forced cell width, so a frame that did not
   change costs no shaping.
+- Block elements (U+2580 to U+259F) and box drawing lines (U+2500 to U+257F, but the dashed,
+  double and diagonal ones) are painted as quads snapped to device pixels, not with the font
+  (`state/box_drawing.rs`), as kitty and Ghostty do: logos and frames meet across cells.
 
 ## Testing and debug hooks
 

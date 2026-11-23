@@ -19,6 +19,7 @@ use tterm_term::{
 };
 
 use crate::actions::{Copy, Paste};
+use crate::state::box_drawing;
 use crate::state::drop::{DropPreview, size_label};
 use crate::state::profiles::{Origin, Profile};
 use crate::state::settings::Settings;
@@ -941,7 +942,7 @@ fn paint_grid(data: &PaintData, bounds: Bounds<Pixels>, window: &mut Window, cx:
             } else {
                 rgb(run.fg)
             };
-            paint_text(
+            paint_cells(
                 &run.text,
                 run_font,
                 color,
@@ -973,7 +974,7 @@ fn paint_grid(data: &PaintData, bounds: Bounds<Pixels>, window: &mut Window, cx:
                     if run.bold {
                         cursor_font.weight = FontWeight::BOLD;
                     }
-                    paint_text(
+                    paint_cells(
                         &text,
                         cursor_font,
                         rgb(frame.background),
@@ -1046,6 +1047,128 @@ fn paint_grid(data: &PaintData, bounds: Bounds<Pixels>, window: &mut Window, cx:
             .corner_radii(px(SCROLL_INDICATOR_WIDTH / 2.0)),
         );
     }
+}
+
+/// Paints one run of text on the grid: block and box drawing characters as shapes that fill
+/// their cells, the rest with the font.
+#[allow(clippy::too_many_arguments)]
+fn paint_cells(
+    text: &str,
+    font: Font,
+    color: Hsla,
+    underline: bool,
+    strikethrough: bool,
+    cells: u16,
+    at: Point<Pixels>,
+    metrics: CellMetrics,
+    window: &mut Window,
+    cx: &mut App,
+) {
+    // Only a run of narrow characters has one character per cell.
+    let narrow = text.chars().count() == usize::from(cells);
+    if !narrow || !text.chars().any(box_drawing::is_drawn) {
+        paint_text(
+            text,
+            font,
+            color,
+            underline,
+            strikethrough,
+            cells,
+            at,
+            metrics,
+            window,
+            cx,
+        );
+        return;
+    }
+    let mut rest = String::with_capacity(text.len());
+    for (index, ch) in text.chars().enumerate() {
+        let cell = point(at.x + metrics.width * index as f32, at.y);
+        if paint_drawn(ch, cell, color, metrics, window) {
+            rest.push(' ');
+        } else {
+            rest.push(ch);
+        }
+    }
+    if underline || strikethrough || rest.chars().any(|ch| ch != ' ') {
+        paint_text(
+            &rest,
+            font,
+            color,
+            underline,
+            strikethrough,
+            cells,
+            at,
+            metrics,
+            window,
+            cx,
+        );
+    }
+}
+
+/// Paints `ch` as shapes on the cell at `at`, if it is a block or box drawing character. The
+/// edges are snapped to device pixels, so neighboring cells meet without seams.
+fn paint_drawn(
+    ch: char,
+    at: Point<Pixels>,
+    color: Hsla,
+    metrics: CellMetrics,
+    window: &mut Window,
+) -> bool {
+    let scale = window.scale_factor();
+    // A light line is a twelfth of the font size (a point at 12 pt, as kitty's), in whole
+    // device pixels.
+    let light = (f32::from(metrics.font_size) / 12.0 * scale)
+        .round()
+        .max(1.0)
+        / scale;
+    let Some(shapes) = box_drawing::shapes(
+        ch,
+        f32::from(metrics.width),
+        f32::from(metrics.height),
+        light,
+    ) else {
+        return false;
+    };
+    let snap = |value: f32| px((value * scale).round() / scale);
+    let (x, y) = (f32::from(at.x), f32::from(at.y));
+    match shapes {
+        box_drawing::Shapes::Rects(rects) => {
+            for rect in rects {
+                let left = snap(x + rect.x);
+                let top = snap(y + rect.y);
+                let right = snap(x + rect.x + rect.w).max(left + px(1.0 / scale));
+                let bottom = snap(y + rect.y + rect.h).max(top + px(1.0 / scale));
+                window.paint_quad(fill(
+                    Bounds::from_corners(point(left, top), point(right, bottom)),
+                    Hsla {
+                        a: color.a * rect.alpha,
+                        ..color
+                    },
+                ));
+            }
+        }
+        box_drawing::Shapes::Corner(corner) => {
+            // The center of a snapped line, so the curve meets the straight lines next to it.
+            let half = corner.thickness / 2.0;
+            let line = |(dx, dy): (f32, f32)| {
+                point(
+                    snap(x + dx - half) + px(half),
+                    snap(y + dy - half) + px(half),
+                )
+            };
+            let mut path = PathBuilder::stroke(px(corner.thickness));
+            path.move_to(line(corner.start));
+            path.line_to(line(corner.from));
+            path.curve_to(line(corner.to), line(corner.ctrl));
+            path.line_to(line(corner.end));
+            match path.build() {
+                Ok(path) => window.paint_path(path, color),
+                Err(error) => log::trace!("corner not painted: {error}"),
+            }
+        }
+    }
+    true
 }
 
 /// Shapes and paints one run of text on the grid, every character on its cell.
