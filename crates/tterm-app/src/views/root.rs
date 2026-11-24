@@ -25,8 +25,9 @@ use crate::state::settings::{
 };
 use crate::state::tabs::Tabs;
 use crate::theme::metrics::{
-    BAR_BUTTON_SIZE, RADIUS_SM, TAB_ACCENT_HEIGHT, TAB_BAR_HEIGHT, TAB_CLOSE_SIZE, TAB_ICON_SIZE,
-    TAB_MAX_WIDTH, TAB_MIN_WIDTH,
+    BAR_BUTTON_SIZE, BAR_BUTTON_TOP, RADIUS_SM, TAB_ACCENT_HEIGHT, TAB_BAR_HEIGHT, TAB_CLOSE_SIZE,
+    TAB_HEIGHT, TAB_ICON_SIZE, TAB_MAX_WIDTH, TAB_MIN_WIDTH, TAB_RADIUS, TAB_STRIP_LEFT,
+    TAB_TOP_GAP,
 };
 use crate::theme::{Palette, PaletteExt as _, TerminalColors as _};
 
@@ -839,6 +840,9 @@ impl AppView {
         let mut strip = h_flex()
             .id("tab-strip")
             .items_start()
+            .pt(px(TAB_TOP_GAP))
+            .pl(px(TAB_STRIP_LEFT))
+            .gap(px(2.0))
             .min_w_0()
             .flex_shrink(1.0)
             .overflow_hidden()
@@ -857,7 +861,7 @@ impl AppView {
         row = row.child(strip).child(no_drag(
             bar_button("new-tab", IconName::Plus, palette)
                 .ml(px(4.0))
-                .mt(px(4.0))
+                .mt(px(BAR_BUTTON_TOP))
                 .tooltip(|window, cx| {
                     Tooltip::new(SharedString::from(t!("tabs.new")))
                         .action(&NewTab, Some(CONTEXT))
@@ -866,18 +870,20 @@ impl AppView {
                 .on_click(cx.listener(|view, _, window, cx| view.new_tab(&NewTab, window, cx))),
         ));
         if self.profiles.has_choice() {
-            row = row.child(no_drag(div().mt(px(4.0)).child(
+            row = row.child(no_drag(div().mt(px(BAR_BUTTON_TOP)).child(
                 super::profile_menu::chevron(cx.weak_entity(), self.profiles.clone(), palette),
             )));
         }
         row = row.child(div().flex_1());
         if let Some(update) = self.render_update_button(palette, cx) {
-            row = row.child(no_drag(div().mt(px(4.0)).mr(px(6.0)).child(update)));
+            row = row.child(no_drag(
+                div().mt(px(BAR_BUTTON_TOP)).mr(px(6.0)).child(update),
+            ));
         }
         row = row
             .child(no_drag(
                 bar_button("agent-usage", IconName::ChartNoAxesColumn, palette)
-                    .mt(px(4.0))
+                    .mt(px(BAR_BUTTON_TOP))
                     .mr(px(2.0))
                     .tooltip(|window, cx| {
                         Tooltip::new(SharedString::from(t!("usage.open"))).build(window, cx)
@@ -888,7 +894,7 @@ impl AppView {
             ))
             .child(no_drag(
                 bar_button("settings", IconName::Settings, palette)
-                    .mt(px(4.0))
+                    .mt(px(BAR_BUTTON_TOP))
                     .mr(px(6.0))
                     .tooltip(|window, cx| {
                         Tooltip::new(SharedString::from(t!("settings.open")))
@@ -960,21 +966,22 @@ impl AppView {
             .w(px(TAB_MAX_WIDTH))
             .min_w(px(TAB_MIN_WIDTH))
             .overflow_hidden()
-            .h(px(if active {
-                TAB_BAR_HEIGHT
-            } else {
-                TAB_BAR_HEIGHT - 1.0
-            }))
+            .h(px(TAB_HEIGHT))
             .pl(px(12.0))
             .pr(px(6.0))
             .gap(px(6.0))
             .items_center()
-            .border_r_1()
+            .rounded_t(px(TAB_RADIUS))
             .text_size(px(12.5))
             .cursor_pointer()
             .map(|tab| {
                 if active {
+                    // The active tab comes out of the terminal: its color, joined to it over
+                    // the line under the bar (A6).
                     tab.bg(crate::theme::palette::terminal_bg(cx))
+                        .border_t_1()
+                        .border_l_1()
+                        .border_r_1()
                         .border_color(palette.tab_bar_border())
                         .text_color(palette.fg)
                         .font_weight(FontWeight::MEDIUM)
@@ -982,14 +989,14 @@ impl AppView {
                             div()
                                 .absolute()
                                 .top_0()
-                                .left_0()
-                                .right_0()
+                                .left(px(TAB_RADIUS))
+                                .right(px(TAB_RADIUS))
                                 .h(px(TAB_ACCENT_HEIGHT))
+                                .rounded_b(px(TAB_ACCENT_HEIGHT))
                                 .bg(palette.accent),
                         )
                 } else {
-                    tab.border_color(palette.tab_divider())
-                        .text_color(palette.fg_muted)
+                    tab.text_color(palette.fg_muted)
                         .hover(move |style| style.bg(hover))
                         .active(move |style| style.bg(pressed))
                 }

@@ -5,8 +5,18 @@
 #[allow(unused_imports)]
 pub use telaio_ui::metrics::*;
 
-/// Height of the tab bar, which is also the title bar.
-pub const TAB_BAR_HEIGHT: f32 = 37.0;
+/// Height of the tab bar, which is also the title bar (A6).
+pub const TAB_BAR_HEIGHT: f32 = 40.0;
+/// Space between the top of the window and the tabs, as in Windows Terminal (A6).
+pub const TAB_TOP_GAP: f32 = 6.0;
+/// Height of a tab: the rest of the bar.
+pub const TAB_HEIGHT: f32 = TAB_BAR_HEIGHT - TAB_TOP_GAP;
+/// Space before the first tab (A6).
+pub const TAB_STRIP_LEFT: f32 = 8.0;
+/// Radius of the top corners of a tab (A6).
+pub const TAB_RADIUS: f32 = 8.0;
+/// Space above the buttons of the bar, centering them on the tabs.
+pub const BAR_BUTTON_TOP: f32 = TAB_TOP_GAP + (TAB_HEIGHT - BAR_BUTTON_SIZE) / 2.0;
 /// Widest a tab gets; tabs shrink when they do not fit.
 pub const TAB_MAX_WIDTH: f32 = 168.0;
 /// Narrowest a tab gets.

@@ -176,7 +176,7 @@ impl UsageView {
             .map(|summary| format!("{} – {}", short_date(summary.start), t!("usage.today")))
             .unwrap_or_default();
         TitleBar::new()
-            .h(px(TAB_BAR_HEIGHT + 7.0))
+            .h(px(TAB_BAR_HEIGHT + 4.0))
             .when(!cfg!(target_os = "macos"), |bar| bar.pl(px(10.0)))
             .bg(palette.tab_bar_bg())
             .border_color(palette.tab_bar_border())

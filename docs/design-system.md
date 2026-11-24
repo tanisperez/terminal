@@ -43,7 +43,11 @@ The 16 ANSI colors of the dark theme are kitty's: `#000000 #cc0403 #19cb00 #cecb
 
 | Constant | Value | Use |
 | --- | --- | --- |
-| `TAB_BAR_HEIGHT` | 37 | The tab bar, also the title bar |
+| `TAB_BAR_HEIGHT` | 40 | The tab bar, also the title bar |
+| `TAB_TOP_GAP` | 6 | Between the top of the window and the tabs, as Windows Terminal (A6) |
+| `TAB_HEIGHT` | 34 | A tab, the rest of the bar |
+| `TAB_STRIP_LEFT` | 8 | Before the first tab |
+| `TAB_RADIUS` | 8 | Top corners of a tab; the active one, in the terminal's color, joins it |
 | `TAB_MAX_WIDTH`, `TAB_MIN_WIDTH` | 168, 72 | A tab, shrinking when they do not fit |
 | `TAB_ACCENT_HEIGHT` | 2 | The accent line on top of the active tab |
 | `TAB_CLOSE_SIZE` | 20 | The X of a tab, shown on the active tab and on hover |
