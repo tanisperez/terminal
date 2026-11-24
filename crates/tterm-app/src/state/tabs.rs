@@ -160,6 +160,15 @@ pub fn folder_name(path: &std::path::Path, home: Option<&std::path::Path>) -> St
         .unwrap_or_else(|| path.display().to_string())
 }
 
+/// A path for the tab's tooltip: under `~` when it is in the home folder (design A5).
+pub fn home_path(path: &std::path::Path, home: Option<&std::path::Path>) -> String {
+    match home.and_then(|home| path.strip_prefix(home).ok()) {
+        Some(rest) if rest.as_os_str().is_empty() => "~".to_string(),
+        Some(rest) => format!("~{}{}", std::path::MAIN_SEPARATOR, rest.display()),
+        None => path.display().to_string(),
+    }
+}
+
 /// The folder of an OSC 7 report, as a path: `file://host/path` (percent encoded), or
 /// `kitty-shell-cwd://host/path` (raw, as Ghostty's shell integration sends it). Other forms
 /// are taken as a plain path.
@@ -297,6 +306,17 @@ mod tests {
             tab_label(r"C:\WINDOWS\System32\cmd.exe", "Símbolo del sistema", None),
             "Símbolo del sistema"
         );
+    }
+
+    #[test]
+    fn tooltip_paths_start_with_a_tilde_under_home() {
+        let home = Path::new("/home/me");
+        assert_eq!(home_path(home, Some(home)), "~");
+        assert_eq!(
+            home_path(Path::new("/home/me/dev/terminal"), Some(home)),
+            format!("~{}dev/terminal", std::path::MAIN_SEPARATOR)
+        );
+        assert_eq!(home_path(Path::new("/etc"), Some(home)), "/etc");
     }
 
     #[test]

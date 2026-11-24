@@ -31,7 +31,7 @@ use crate::theme::metrics::{
 use crate::theme::{Palette, PaletteExt as _, TerminalColors as _};
 
 use super::profile_picker::{PickerEvent, ProfilePicker};
-use super::terminal::{TerminalEvent, TerminalView};
+use super::terminal::{TabHover, TerminalEvent, TerminalView};
 use super::usage::{UsageEvent, UsageView};
 
 /// The root view of the window.
@@ -395,7 +395,10 @@ impl AppView {
         for (index, tab) in self.tabs.iter().enumerate() {
             let active = index == self.tabs.active_index();
             let label = tab.read(cx).label();
-            strip = strip.child(no_drag(self.render_tab(index, label, active, palette, cx)));
+            let hover = tab.read(cx).hover_info();
+            strip = strip.child(no_drag(
+                self.render_tab(index, label, hover, active, palette, cx),
+            ));
         }
         row = row.child(strip).child(no_drag(
             bar_button("new-tab", IconName::Plus, palette)
@@ -454,6 +457,7 @@ impl AppView {
         &self,
         index: usize,
         label: String,
+        hover_info: TabHover,
         active: bool,
         palette: &Palette,
         cx: &mut Context<Self>,
@@ -537,6 +541,7 @@ impl AppView {
                 }
             })
             .on_click(cx.listener(move |view, _, window, cx| view.activate(index, window, cx)))
+            .tooltip(move |window, cx| tab_tooltip(hover_info.clone(), window, cx))
             .when(closable, |tab| {
                 tab.on_mouse_up(
                     MouseButton::Middle,
@@ -645,6 +650,41 @@ fn tab_menu(menu: PopupMenu, index: usize, view: &WeakEntity<AppView>, cx: &App)
 }
 
 /// A 28 px icon button of the bar.
+/// The tooltip of a tab (design A5): the full title, the folder and the profile, for names cut
+/// short in a crowded bar.
+fn tab_tooltip(info: TabHover, window: &mut Window, cx: &mut App) -> AnyView {
+    Tooltip::element(move |_, cx| {
+        let palette = cx.palette();
+        let mono = cx.theme().mono_font_family.clone();
+        v_flex()
+            .gap(px(3.0))
+            .py(px(4.0))
+            .max_w(px(380.0))
+            .child(
+                div()
+                    .text_color(palette.fg)
+                    .font_weight(FontWeight::MEDIUM)
+                    .child(info.title.clone()),
+            )
+            .when_some(info.folder.clone(), |tip, folder| {
+                tip.child(
+                    div()
+                        .font_family(mono)
+                        .text_size(px(11.5))
+                        .text_color(palette.fg_muted)
+                        .child(folder),
+                )
+            })
+            .child(
+                div()
+                    .text_size(px(11.5))
+                    .text_color(palette.fg_subtle)
+                    .child(info.profile.clone()),
+            )
+    })
+    .build(window, cx)
+}
+
 fn bar_button(id: &'static str, icon: IconName, palette: &Palette) -> Stateful<Div> {
     let (hover, pressed) = (palette.hover, palette.pressed);
     div()

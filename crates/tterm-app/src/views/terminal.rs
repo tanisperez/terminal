@@ -78,6 +78,17 @@ struct CellMetrics {
     font_size: Pixels,
 }
 
+/// The tooltip of a tab (design A5).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TabHover {
+    /// The title the program set, whole, or the tab's label without one.
+    pub title: String,
+    /// The folder the shell is in, under `~` in the home folder.
+    pub folder: Option<String>,
+    /// The profile the tab runs.
+    pub profile: String,
+}
+
 /// One terminal tab.
 pub struct TerminalView {
     emulator: Emulator,
@@ -292,6 +303,27 @@ impl TerminalView {
             .as_deref()
             .map(|cwd| crate::state::tabs::folder_name(cwd, home.as_deref()));
         crate::state::tabs::tab_label(&title, &self.shell, folder.as_deref())
+    }
+
+    /// What the tab's tooltip shows (design A5): the full title, the folder and the profile.
+    pub fn hover_info(&self) -> TabHover {
+        let title = self.emulator.title();
+        let title = title.trim();
+        let home = std::env::home_dir();
+        TabHover {
+            title: if title.is_empty() {
+                self.label()
+            } else {
+                title.to_string()
+            },
+            folder: self
+                .cwd()
+                .map(|cwd| crate::state::tabs::home_path(&cwd, home.as_deref())),
+            profile: self
+                .profile_name
+                .clone()
+                .unwrap_or_else(|| self.shell.clone()),
+        }
     }
 
     /// The agent this tab runs in its foreground (Claude Code), for the usage screen.
