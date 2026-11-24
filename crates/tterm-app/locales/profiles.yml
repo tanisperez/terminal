@@ -13,14 +13,17 @@ _version: 2
   en: "Command Prompt"
   es: "Símbolo del sistema"
 "profiles.description":
-  en: "What a new tab runs. Detected profiles come from this computer; yours are saved in settings.toml."
-  es: "Lo que ejecuta una pestaña nueva. Los detectados salen de este equipo; los tuyos se guardan en settings.toml."
-"profiles.detected":
-  en: "Detected"
-  es: "Detectados"
-"profiles.mine":
-  en: "Mine"
-  es: "Míos"
+  en: "What a new tab runs. Drag a profile by its handle to change its place in the new tab menu and its Ctrl+Shift+1…9 shortcut. Detected profiles come from this computer; yours are saved in settings.toml."
+  es: "Lo que ejecuta una pestaña nueva. Arrastra un perfil por el asa para cambiar su sitio en el menú de nueva pestaña y su atajo Ctrl+Shift+1…9. Los detectados salen de este equipo; los tuyos se guardan en settings.toml."
+"profiles.order":
+  en: "Menu order"
+  es: "Orden del menú"
+"profiles.reset_order":
+  en: "Reset"
+  es: "Restablecer"
+"profiles.default_tooltip":
+  en: "Default profile"
+  es: "Perfil predeterminado"
 "profiles.new":
   en: "New profile"
   es: "Nuevo perfil"

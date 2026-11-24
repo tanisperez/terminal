@@ -6,6 +6,7 @@
 //! ```toml
 //! default_profile = "zsh"
 //! hidden_profiles = ["fish"]
+//! profile_order = ["claude · telaio", "zsh", "bash"]
 //!
 //! [[profiles]]
 //! name = "claude · telaio"
@@ -16,7 +17,9 @@
 //! ```
 //!
 //! `startup` is typed into the shell, not run instead of it, so the tab stays open when the
-//! program exits.
+//! program exits. `profile_order` (#32, design P2) is the order of the menu and of the number
+//! shortcuts, detected profiles included; a profile it does not name goes after the ones it
+//! names, in its usual place (detected first, then the user's).
 
 use std::path::{Path, PathBuf};
 
@@ -184,8 +187,46 @@ impl Profile {
     }
 }
 
-/// The profiles of the menus: the detected ones not hidden, then the user's, with their
-/// shortcuts, and which one a new tab opens.
+/// Every profile, hidden ones included, by name and origin, in the order of `order` (see the
+/// module docs). A detected profile with the name of one of the user's is left out: the user's
+/// replaces it.
+pub fn ordered(
+    detected: &[Profile],
+    own: &[ProfileConfig],
+    order: &[String],
+) -> Vec<(String, Origin)> {
+    let mut all: Vec<(String, Origin)> = detected
+        .iter()
+        .filter(|profile| !own.iter().any(|config| config.name == profile.name))
+        .map(|profile| (profile.name.clone(), Origin::Detected))
+        .chain(
+            own.iter()
+                .enumerate()
+                .map(|(index, config)| (config.name.clone(), Origin::Own(index))),
+        )
+        .collect();
+    all.sort_by_key(|(name, _)| {
+        order
+            .iter()
+            .position(|other| other == name)
+            .unwrap_or(usize::MAX)
+    });
+    all
+}
+
+/// The names of `list` with the one at `from` moved to `to` (it takes that place), as a
+/// dragged row lands: the new `profile_order`.
+pub fn moved(list: &[(String, Origin)], from: usize, to: usize) -> Vec<String> {
+    let mut names: Vec<String> = list.iter().map(|(name, _)| name.clone()).collect();
+    if from < names.len() {
+        let name = names.remove(from);
+        names.insert(to.min(names.len()), name);
+    }
+    names
+}
+
+/// The profiles of the menus: the visible ones in the user's order, with their shortcuts, and
+/// which one a new tab opens.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Profiles {
     /// Every visible profile, in menu order.
@@ -195,26 +236,26 @@ pub struct Profiles {
 }
 
 impl Profiles {
-    /// Builds the list. A detected profile with the name of one of the user's is left out: the
-    /// user's replaces it. Profiles without a shortcut get the first free numbers, in order.
+    /// Builds the list in the order of [`ordered`], without the hidden detected profiles.
+    /// Profiles without a shortcut get the first free numbers, in order.
     pub fn build(
         detected: &[Profile],
         own: &[ProfileConfig],
         hidden: &[String],
+        order: &[String],
         default_name: Option<&str>,
         home: Option<&Path>,
     ) -> Self {
-        let mut list: Vec<Profile> = detected
-            .iter()
-            .filter(|profile| !hidden.contains(&profile.name))
-            .filter(|profile| !own.iter().any(|config| config.name == profile.name))
-            .cloned()
+        let mut list: Vec<Profile> = ordered(detected, own, order)
+            .into_iter()
+            .filter_map(|(name, origin)| match origin {
+                Origin::Detected if hidden.contains(&name) => None,
+                Origin::Detected => detected.iter().find(|p| p.name == name).cloned(),
+                Origin::Own(index) => own
+                    .get(index)
+                    .map(|config| Profile::own(index, config, home)),
+            })
             .collect();
-        list.extend(
-            own.iter()
-                .enumerate()
-                .map(|(index, config)| Profile::own(index, config, home)),
-        );
         let mut taken: Vec<u8> = Vec::new();
         for profile in &mut list {
             match profile.shortcut {
@@ -536,6 +577,7 @@ mod tests {
             &detected,
             &[own("claude", Some(1)), own("bash", None)],
             &["fish".to_string()],
+            &[],
             Some("claude"),
             Some(Path::new("/home/me")),
         );
@@ -551,9 +593,28 @@ mod tests {
     }
 
     #[test]
+    fn the_order_puts_named_profiles_first_and_moves_them() {
+        let detected = detect_unix(Some("/bin/zsh"), SHELLS, |_| true);
+        let own = [own("claude", None)];
+        let order = ["claude".to_string(), "fish".to_string()];
+        let list = ordered(&detected, &own, &order);
+        let in_order: Vec<&str> = list.iter().map(|(name, _)| name.as_str()).collect();
+        assert_eq!(in_order, vec!["claude", "fish", "zsh", "bash"]);
+        assert_eq!(list[0].1, Origin::Own(0));
+        // The menu leaves the hidden one out and numbers the rest in that order.
+        let profiles = Profiles::build(&detected, &own, &["fish".to_string()], &order, None, None);
+        assert_eq!(names(&profiles.list), vec!["claude", "zsh", "bash"]);
+        let shortcuts: Vec<_> = profiles.list.iter().map(|p| p.shortcut).collect();
+        assert_eq!(shortcuts, vec![Some(1), Some(2), Some(3)]);
+        // Dragging zsh (2) onto claude's place (0).
+        assert_eq!(moved(&list, 2, 0), vec!["zsh", "claude", "fish", "bash"]);
+        assert_eq!(moved(&list, 0, 3), vec!["fish", "zsh", "bash", "claude"]);
+    }
+
+    #[test]
     fn an_unknown_default_falls_back_to_the_first() {
         let detected = detect_unix(Some("/bin/zsh"), "", |_| true);
-        let profiles = Profiles::build(&detected, &[], &[], Some("nope"), None);
+        let profiles = Profiles::build(&detected, &[], &[], &[], Some("nope"), None);
         assert_eq!(profiles.default_profile().unwrap().name, "zsh");
         assert!(!profiles.has_choice());
     }

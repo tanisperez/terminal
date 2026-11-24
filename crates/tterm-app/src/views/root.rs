@@ -135,6 +135,7 @@ impl AppView {
             &self.detected,
             &self.settings.profiles,
             &self.settings.hidden_profiles,
+            &self.settings.profile_order,
             self.settings.default_profile.as_deref(),
             home.as_deref(),
         );

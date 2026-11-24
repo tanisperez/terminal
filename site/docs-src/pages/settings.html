@@ -35,6 +35,7 @@ description: Every setting of Tanis Terminal, in the Settings window and in sett
 ```toml title="settings.toml"
 default_profile = "claude · telaio"
 hidden_profiles = ["fish"]
+profile_order = ["claude · telaio", "zsh"]
 
 [[profiles]]
 name = "claude · telaio"
@@ -48,6 +49,7 @@ shortcut = 3
     <tbody>
         <tr><td><code>default_profile</code></td><td>The profile a new tab opens. The first one when missing.</td></tr>
         <tr><td><code>hidden_profiles</code></td><td>Detected shells left out of the menus.</td></tr>
+        <tr><td><code>profile_order</code></td><td>The order of the profiles in the menus and of their number shortcuts, by name. Profiles it does not name come after, detected ones first. Written when a profile is dragged in Settings, Profiles.</td></tr>
         <tr><td><code>name</code></td><td>The name of the profile and of its tabs.</td></tr>
         <tr><td><code>shell</code></td><td>The program to run. Your default shell when missing.</td></tr>
         <tr><td><code>cwd</code></td><td>The folder the tab starts in; <code>~</code> is your home.</td></tr>

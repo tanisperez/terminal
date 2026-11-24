@@ -138,6 +138,9 @@ pub struct Settings {
     pub default_profile: Option<String>,
     /// Detected profiles left out of the menus.
     pub hidden_profiles: Vec<String>,
+    /// The order of the profiles in the menus and their number shortcuts (#32), by name.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub profile_order: Vec<String>,
     /// The user's own profiles. Last: TOML writes tables after the plain values.
     pub profiles: Vec<ProfileConfig>,
 }
@@ -157,6 +160,7 @@ impl Default for Settings {
             check_updates: true,
             default_profile: None,
             hidden_profiles: Vec::new(),
+            profile_order: Vec::new(),
             profiles: Vec::new(),
         }
     }
@@ -273,6 +277,13 @@ fn parse_settings(content: &str) -> Settings {
             .map(String::from)
             .collect();
     }
+    if let Some(list) = table.get("profile_order").and_then(toml::Value::as_array) {
+        settings.profile_order = list
+            .iter()
+            .filter_map(toml::Value::as_str)
+            .map(String::from)
+            .collect();
+    }
     if let Some(list) = table.get("profiles").and_then(toml::Value::as_array) {
         for profile in list.iter().filter_map(toml::Value::as_table) {
             match ProfileConfig::from_toml(profile) {
@@ -372,6 +383,7 @@ mod tests {
             check_updates: false,
             default_profile: Some("claude · telaio".to_string()),
             hidden_profiles: vec!["fish".to_string()],
+            profile_order: vec!["ssh · servidor".to_string(), "zsh".to_string()],
             profiles: vec![
                 ProfileConfig {
                     name: "claude · telaio".to_string(),
