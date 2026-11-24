@@ -118,6 +118,7 @@ impl AppView {
             view.settings_category = category;
             let weak = cx.weak_entity();
             window.defer(cx, move |window, cx| {
+                let _ = weak.update(cx, |view, cx| view.ensure_color_editor(window, cx));
                 super::settings::open(weak, window, cx)
             });
         }
@@ -346,6 +347,7 @@ impl AppView {
     }
 
     fn open_settings(&mut self, _: &OpenSettings, window: &mut Window, cx: &mut Context<Self>) {
+        self.ensure_color_editor(window, cx);
         super::settings::open(cx.weak_entity(), window, cx);
     }
 
@@ -364,6 +366,8 @@ impl AppView {
         crate::state::locale::apply(language);
         crate::theme::apply_settings(cx, &settings);
         telaio_ui::ThemeChoice::from(settings.theme).apply(Some(window), cx);
+        crate::theme::clear_surface(cx);
+        window.set_background_appearance(crate::window_background(settings.background_opacity));
         self.font_size = settings.font_size;
         self.settings = settings.clone();
         self.rebuild_profiles();
@@ -388,7 +392,11 @@ impl AppView {
     }
 
     fn render_bar(&self, palette: &Palette, cx: &mut Context<Self>) -> impl IntoElement {
-        let (bar_bg, border) = (palette.tab_bar_bg(), palette.tab_bar_border());
+        let opacity = crate::theme::palette::background_opacity(cx);
+        let (bar_bg, border) = (
+            palette.tab_bar_bg().opacity(opacity),
+            palette.tab_bar_border(),
+        );
         let mut row = h_flex().size_full().items_start();
         // Tabs shrink to their minimum; past it the strip clips them and the buttons of the
         // bar stay in place.
@@ -731,11 +739,16 @@ impl Render for AppView {
                 .child(usage.clone())
                 .into_any_element();
         }
+        // A translucent window (#31) leaves the ground to the terminals, so their background is
+        // not painted twice.
+        let opaque = crate::theme::palette::opaque(cx);
         v_flex()
             .key_context(CONTEXT)
             .relative()
             .size_full()
-            .bg(crate::theme::palette::terminal_bg(cx))
+            .when(opaque, |root| {
+                root.bg(crate::theme::palette::terminal_bg(cx))
+            })
             .text_color(palette.fg)
             .on_action(cx.listener(Self::new_tab))
             .on_action(cx.listener(Self::open_profile))

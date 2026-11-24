@@ -81,6 +81,7 @@ fn main() -> ExitCode {
             default: FIRST_WINDOW_SIZE,
         };
         let mut window_options = window::options(cx, &IDENTITY, sizes);
+        window_options.window_background = window_background(settings.background_opacity);
         let saved_window = state::window::load();
         if let Some(saved) = saved_window {
             window_options.window_bounds = Some(saved_window_bounds(&saved, sizes, cx));
@@ -96,6 +97,13 @@ fn main() -> ExitCode {
                     weak.upgrade()
                         .is_some_and(|view| view.read(cx).follows_system_theme())
                 });
+                // After the theme follows the system (registered later, so it runs later), a
+                // translucent window clears the surface the theme brought back (#31).
+                view.update(cx, |_, cx| {
+                    cx.observe_window_appearance(window, |_, _, cx| theme::clear_surface(cx))
+                        .detach();
+                });
+                theme::clear_surface(cx);
                 cx.new(|cx| Root::new(view, window, cx))
             });
             // Opening the very first window failing is not recoverable.
@@ -204,4 +212,13 @@ fn log_startup(level: LogLevel, from_env: Option<&str>, log_path: Option<&Path>)
         state::settings::settings_path()
             .map_or_else(|| "unknown".to_string(), |path| path.display().to_string()),
     );
+}
+
+/// The window's background for an opacity of the terminal (#31): see-through below 1.0.
+pub fn window_background(opacity: f32) -> gpui_kit::WindowBackgroundAppearance {
+    if opacity < 1.0 {
+        gpui_kit::WindowBackgroundAppearance::Transparent
+    } else {
+        gpui_kit::WindowBackgroundAppearance::Opaque
+    }
 }

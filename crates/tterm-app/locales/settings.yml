@@ -123,3 +123,9 @@ _version: 2
 "settings.category.colors":
   en: "Colors"
   es: "Colores"
+"settings.opacity.label":
+  en: "Background opacity"
+  es: "Opacidad del fondo"
+"settings.opacity.description":
+  en: "Below 100 % what is behind the window shows through. Text stays opaque."
+  es: "Por debajo de 100 % se ve lo que hay detrás. El texto sigue opaco."

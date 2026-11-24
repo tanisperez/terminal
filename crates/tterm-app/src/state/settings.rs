@@ -29,6 +29,11 @@ pub const FONT_SIZE_STEP: f32 = 1.0;
 /// The default terminal font size, in points, as kitty's.
 pub const DEFAULT_FONT_SIZE: f32 = 12.0;
 
+/// The opacity of the terminal's background (#31): 1.0 is opaque, the default.
+pub const OPACITY_RANGE: RangeInclusive<f32> = 0.5..=1.0;
+/// The step of the opacity slider.
+pub const OPACITY_STEP: f32 = 0.05;
+
 /// The default terminal font, bundled with the app (design T).
 pub const DEFAULT_FONT: &str = "Noto Sans Mono";
 
@@ -158,6 +163,8 @@ pub struct Settings {
     pub font: String,
     /// The terminal font size, in points, clamped to [`FONT_SIZE_RANGE`].
     pub font_size: f32,
+    /// The opacity of the terminal's background, 0.5 to 1.0; text stays opaque (#31).
+    pub background_opacity: f32,
     /// The cursor shape.
     pub cursor: CursorChoice,
     /// Whether the cursor blinks while the user types, as kitty's.
@@ -212,6 +219,7 @@ impl Default for Settings {
             theme: ThemeChoice::default(),
             font: DEFAULT_FONT.to_string(),
             font_size: DEFAULT_FONT_SIZE,
+            background_opacity: 1.0,
             cursor: CursorChoice::default(),
             cursor_blink: true,
             paste_images: true,
@@ -314,6 +322,13 @@ fn parse_settings(content: &str) -> Settings {
     }
     if let Some(value) = table.get("font_size").and_then(as_f32) {
         settings.font_size = clamp_font_size(value);
+    }
+    if let Some(value) = table
+        .get("background_opacity")
+        .and_then(|value| value.as_float().or(value.as_integer().map(|n| n as f64)))
+    {
+        settings.background_opacity =
+            (value as f32).clamp(*OPACITY_RANGE.start(), *OPACITY_RANGE.end());
     }
     if let Some(value) = text("cursor").and_then(CursorChoice::parse) {
         settings.cursor = value;
@@ -449,6 +464,23 @@ mod tests {
     }
 
     #[test]
+    fn the_background_opacity_stays_in_range() {
+        assert_eq!(parse_settings("").background_opacity, 1.0);
+        assert_eq!(
+            parse_settings("background_opacity = 0.8").background_opacity,
+            0.8
+        );
+        assert_eq!(
+            parse_settings("background_opacity = 0.1").background_opacity,
+            0.5
+        );
+        assert_eq!(
+            parse_settings("background_opacity = 1").background_opacity,
+            1.0
+        );
+    }
+
+    #[test]
     fn new_tabs_open_in_the_active_tab_folder_or_the_start_folder() {
         let active = Some(PathBuf::from("/home/me/dev/terminal"));
         let start = Some(PathBuf::from("/home/me/dev"));
@@ -484,6 +516,7 @@ mod tests {
             theme: ThemeChoice::System,
             font: "JetBrains Mono".to_string(),
             font_size: 15.0,
+            background_opacity: 0.85,
             cursor: CursorChoice::Underline,
             cursor_blink: false,
             paste_images: false,

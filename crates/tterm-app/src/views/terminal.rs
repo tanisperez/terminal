@@ -1145,7 +1145,7 @@ impl Render for TerminalView {
             .track_focus(&self.focus)
             .relative()
             .size_full()
-            .bg(rgb(self.frame.background))
+            .bg(rgb(self.frame.background).opacity(crate::theme::palette::background_opacity(cx)))
             .px(px(TERMINAL_PADDING_X))
             .py(px(TERMINAL_PADDING_Y))
             .cursor(if self.hover_link.is_some() {

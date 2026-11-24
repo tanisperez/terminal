@@ -28,11 +28,32 @@ pub fn apply_settings(cx: &mut App, settings: &Settings) {
     telaio_ui::apply(cx, &theme_family(settings));
 }
 
-/// The dark theme's terminal colors, from the user's `[colors]`.
+/// The dark theme's terminal colors, from the user's `[colors]`, and the background opacity.
 fn set_dark_scheme(cx: &mut App, settings: &Settings) {
     cx.set_global(palette::DarkScheme(crate::state::colors::dark_scheme(
         &settings.colors,
     )));
+    cx.set_global(palette::BackgroundOpacity(settings.background_opacity));
+}
+
+/// Makes the window's surface see-through while the background is translucent (#31).
+/// gpui-kit's `Root` paints the theme's background under everything, and every theme change (a
+/// choice in Settings, the system turning dark) brings it back: call this after each one. A no-op
+/// while the window is opaque. tterm's own views paint the terminal background with the opacity
+/// instead.
+pub fn clear_surface(cx: &mut App) {
+    if palette::opaque(cx) {
+        return;
+    }
+    let background = gpui_kit::component::Theme::global(cx)
+        .tokens
+        .background
+        .color;
+    if background.a > 0.0 {
+        let clear = background.opacity(0.0);
+        gpui_kit::component::Theme::global_mut(cx).tokens.background =
+            gpui_kit::component::ThemeToken::new(clear, clear.into());
+    }
 }
 
 /// The theme family: telaio's default tokens and fonts, with the terminal font as the monospace

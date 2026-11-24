@@ -18,8 +18,8 @@ use telaio_ui::components::{
 
 use crate::state::locale::{LANGUAGES, LanguageChoice};
 use crate::state::settings::{
-    CursorChoice, FONT_SIZE_RANGE, FONT_SIZE_STEP, NewTabsIn, Settings, ThemeChoice, path_label,
-    settings_path,
+    CursorChoice, FONT_SIZE_RANGE, FONT_SIZE_STEP, NewTabsIn, OPACITY_RANGE, OPACITY_STEP,
+    Settings, ThemeChoice, path_label, settings_path,
 };
 use crate::theme::metrics::CONTROL_HEIGHT;
 use crate::theme::{Palette, PaletteExt as _};
@@ -85,7 +85,8 @@ impl Category {
     }
 }
 
-/// Opens the Settings dialog, unless one is already open.
+/// Opens the Settings dialog, unless one is already open. The caller creates the Colors page's
+/// picker first ([`AppView::ensure_color_editor`]): `AppView` may be the entity being updated.
 pub fn open(weak: WeakEntity<AppView>, window: &mut Window, cx: &mut App) {
     if window.has_active_dialog(cx) {
         return;
@@ -102,7 +103,6 @@ pub fn open(weak: WeakEntity<AppView>, window: &mut Window, cx: &mut App) {
             .filter(|font| installed.iter().any(|name| name == *font))
             .map(|font| font.to_string()),
     );
-    let _ = weak.update(cx, |view, cx| view.ensure_color_editor(window, cx));
     window.open_dialog(cx, move |dialog, window, _| {
         let weak = weak.clone();
         let fonts = fonts.clone();
@@ -258,6 +258,16 @@ fn appearance_section(
         .on_change(move |size, window, cx| {
             update(&size_weak, window, cx, |settings| settings.font_size = size)
         });
+    let opacity_weak = weak.clone();
+    let opacity = NumberStepper::new("settings-background-opacity", settings.background_opacity)
+        .step(OPACITY_STEP)
+        .range(*OPACITY_RANGE.start(), *OPACITY_RANGE.end())
+        .format(|value| format!("{:.0} %", value * 100.0))
+        .on_change(move |value, window, cx| {
+            update(&opacity_weak, window, cx, |settings| {
+                settings.background_opacity = value
+            })
+        });
     let mut cursor = SegmentedControl::new("settings-cursor");
     for choice in CursorChoice::ALL {
         let weak = weak.clone();
@@ -299,6 +309,10 @@ fn appearance_section(
                 .child(font_select)
                 .child(font_size),
         ))
+        .child(
+            LabeledRow::new(t!("settings.opacity.label"), opacity)
+                .description(t!("settings.opacity.description")),
+        )
         .child(LabeledRow::new(t!("settings.cursor.label"), cursor))
         .child(
             LabeledRow::new(t!("settings.cursor_blink.label"), blink)

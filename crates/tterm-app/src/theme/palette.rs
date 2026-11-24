@@ -49,9 +49,26 @@ pub fn scheme(cx: &App) -> ColorScheme {
     }
 }
 
-/// The ground of the window and the active tab: the terminal's background.
+/// The opacity of the terminal's background (#31), from the settings.
+pub struct BackgroundOpacity(pub f32);
+
+impl Global for BackgroundOpacity {}
+
+/// The opacity of the terminal's background, 1.0 without a setting.
+pub fn background_opacity(cx: &App) -> f32 {
+    cx.try_global::<BackgroundOpacity>()
+        .map(|opacity| opacity.0)
+        .unwrap_or(1.0)
+}
+
+/// Whether the window is opaque, the default.
+pub fn opaque(cx: &App) -> bool {
+    background_opacity(cx) >= 1.0
+}
+
+/// The ground of the window and the active tab: the terminal's background, with the opacity.
 pub fn terminal_bg(cx: &App) -> Hsla {
-    rgb(scheme(cx).background)
+    rgb(scheme(cx).background).opacity(background_opacity(cx))
 }
 
 /// The terminal's colors, for the mode of the palette.
