@@ -6,3 +6,6 @@ _version: 2
 "tabs.close":
   en: "Close tab"
   es: "Cerrar pestaña"
+"tabs.move_to_new_window":
+  en: "Move to New Window"
+  es: "Mover a una ventana nueva"

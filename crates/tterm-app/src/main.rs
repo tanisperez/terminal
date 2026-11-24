@@ -26,6 +26,57 @@ use views::AppView;
 const MIN_WINDOW_SIZE: (f32, f32) = (640.0, 400.0);
 /// The size of the first window, before any size is saved: a comfortable 100 x 30 grid.
 const FIRST_WINDOW_SIZE: (f32, f32) = (1120.0, 680.0);
+/// The sizes of every window.
+const WINDOW_SIZES: window::WindowSizes = window::WindowSizes {
+    min: MIN_WINDOW_SIZE,
+    default: FIRST_WINDOW_SIZE,
+};
+
+/// What a new window starts with.
+pub enum FirstTabs {
+    /// A tab per folder of the command line, or the default profile's without any.
+    Folders(Vec<std::path::PathBuf>),
+    /// A tab moved from another window, still running (#34).
+    Moved(Entity<views::TerminalView>),
+}
+
+/// Opens a window of tterm with `first` in it, at `bounds` (the platform's place and the default
+/// size when `None`). `saved` is the size saved by the last window closed, for the first one.
+/// Returns whether it opened.
+pub fn open_window(
+    cx: &mut App,
+    settings: state::settings::Settings,
+    first: FirstTabs,
+    bounds: Option<WindowBounds>,
+    saved: Option<WindowState>,
+) -> bool {
+    let mut window_options = window::options(cx, &IDENTITY, WINDOW_SIZES);
+    window_options.window_background = window_background(settings.background_opacity);
+    if bounds.is_some() {
+        window_options.window_bounds = bounds;
+    }
+    let theme_choice = settings.theme;
+    cx.open_window(window_options, move |window, cx| {
+        telaio_ui::ThemeChoice::from(theme_choice).apply(Some(window), cx);
+        let view = cx.new(|cx| AppView::new(settings, first, window, cx));
+        remember_window_size(saved, &view, window, cx);
+        let weak = view.downgrade();
+        window::follow_system_appearance(window, move |cx| {
+            weak.upgrade()
+                .is_some_and(|view| view.read(cx).follows_system_theme())
+        });
+        // After the theme follows the system (registered later, so it runs later), a
+        // translucent window clears the surface the theme brought back (#31).
+        view.update(cx, |_, cx| {
+            cx.observe_window_appearance(window, |_, _, cx| theme::clear_surface(cx))
+                .detach();
+        });
+        theme::clear_surface(cx);
+        cx.new(|cx| Root::new(view, window, cx))
+    })
+    .map_err(|error| log::error!("could not open a window: {error}"))
+    .is_ok()
+}
 
 fn main() -> ExitCode {
     // `--help`, `--version` and a wrong option print and exit before anything else.
@@ -68,7 +119,6 @@ fn main() -> ExitCode {
         }
     });
 
-    let theme_choice = settings.theme;
     let app = window::application();
     app.run(move |cx| {
         window::init(cx, &IDENTITY);
@@ -76,39 +126,17 @@ fn main() -> ExitCode {
         views::bind_keys(cx);
         theme::install(cx, &settings);
 
-        let sizes = window::WindowSizes {
-            min: MIN_WINDOW_SIZE,
-            default: FIRST_WINDOW_SIZE,
-        };
-        let mut window_options = window::options(cx, &IDENTITY, sizes);
-        window_options.window_background = window_background(settings.background_opacity);
         let saved_window = state::window::load();
-        if let Some(saved) = saved_window {
-            window_options.window_bounds = Some(saved_window_bounds(&saved, sizes, cx));
-        }
-
+        let bounds = saved_window.map(|saved| saved_window_bounds(&saved, WINDOW_SIZES, cx));
         cx.spawn(async move |cx| {
-            let opened = cx.open_window(window_options, move |window, cx| {
-                telaio_ui::ThemeChoice::from(theme_choice).apply(Some(window), cx);
-                let view = cx.new(|cx| AppView::new(settings, dirs, window, cx));
-                remember_window_size(saved_window, &view, window, cx);
-                let weak = view.downgrade();
-                window::follow_system_appearance(window, move |cx| {
-                    weak.upgrade()
-                        .is_some_and(|view| view.read(cx).follows_system_theme())
-                });
-                // After the theme follows the system (registered later, so it runs later), a
-                // translucent window clears the surface the theme brought back (#31).
-                view.update(cx, |_, cx| {
-                    cx.observe_window_appearance(window, |_, _, cx| theme::clear_surface(cx))
-                        .detach();
-                });
-                theme::clear_surface(cx);
-                cx.new(|cx| Root::new(view, window, cx))
+            let opened = cx.update(|cx| {
+                open_window(cx, settings, FirstTabs::Folders(dirs), bounds, saved_window)
             });
             // Opening the very first window failing is not recoverable.
-            #[allow(clippy::expect_used)]
-            opened.expect("failed to open the main window");
+            #[allow(clippy::panic)]
+            if !opened {
+                panic!("failed to open the main window");
+            }
         })
         .detach();
     });

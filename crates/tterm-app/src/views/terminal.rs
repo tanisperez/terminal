@@ -146,6 +146,8 @@ pub struct TerminalView {
     resize_wait: u64,
     _resize: Task<()>,
     _output: Task<()>,
+    /// The focus and blur subscriptions in the tab's window.
+    _focus: Vec<Subscription>,
 }
 
 /// The size shown over the grid while the window is resized (design C).
@@ -239,6 +241,7 @@ impl TerminalView {
             selecting: false,
             mouse_pressed: None,
             _output: Task::ready(()),
+            _focus: Vec::new(),
         };
         match pty::spawn(&options) {
             Ok((pty, reader)) => {
@@ -253,7 +256,8 @@ impl TerminalView {
                     .spawn(move || read_output(reader, sender))
                     .map_err(|error| log::warn!("could not start the reader thread: {error}"))
                     .ok();
-                this._output = cx.spawn_in(window, async move |this, cx| {
+                // Not tied to the window: the tab may move to another one (#34).
+                this._output = cx.spawn(async move |this, cx| {
                     while let Ok(mut chunk) = receiver.recv().await {
                         while chunk.len() < MAX_BATCH_BYTES {
                             match receiver.try_recv() {
@@ -278,16 +282,21 @@ impl TerminalView {
             }
         }
         this.refresh_frame();
-
-        cx.on_focus(&this.focus, window, |view, _, cx| {
-            view.on_focus_change(true, cx)
-        })
-        .detach();
-        cx.on_blur(&this.focus, window, |view, _, cx| {
-            view.on_focus_change(false, cx)
-        })
-        .detach();
+        this.attach(window, cx);
         this
+    }
+
+    /// Follows the focus in `window`, the one the tab shows in: at creation, and again when the
+    /// tab moves to another window (#34).
+    pub fn attach(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self._focus = vec![
+            cx.on_focus(&self.focus, window, |view, _, cx| {
+                view.on_focus_change(true, cx)
+            }),
+            cx.on_blur(&self.focus, window, |view, _, cx| {
+                view.on_focus_change(false, cx)
+            }),
+        ];
     }
 
     /// The handle to focus this terminal.

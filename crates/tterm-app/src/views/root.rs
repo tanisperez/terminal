@@ -7,7 +7,7 @@
 use std::path::PathBuf;
 
 use gpui_kit::assets::IconName;
-use gpui_kit::component::menu::{ContextMenuExt as _, PopupMenu};
+use gpui_kit::component::menu::{ContextMenuExt as _, PopupMenu, PopupMenuItem};
 use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::*;
 use gpui_kit::prelude::*;
@@ -16,8 +16,8 @@ use rust_i18n::t;
 use telaio_ui::components::{CloseScope, TabMenuTarget, close_item};
 
 use crate::actions::{
-    CONTEXT, CloseTab, NewTab, NextTab, OpenProfile, OpenProfilePicker, OpenSettings, OpenUsage,
-    PreviousTab, ZoomIn, ZoomOut, ZoomReset,
+    CONTEXT, CloseTab, MoveTabToNewWindow, NewTab, NextTab, OpenProfile, OpenProfilePicker,
+    OpenSettings, OpenUsage, PreviousTab, ZoomIn, ZoomOut, ZoomReset,
 };
 use crate::state::profiles::{self, Profile, Profiles};
 use crate::state::settings::{
@@ -63,13 +63,18 @@ pub struct AppView {
     /// How this copy was installed, as far as updates care. Read once at startup.
     pub(crate) update_env: crate::state::update::UpdateEnv,
     _subscriptions: Vec<Subscription>,
+    /// The tab being dragged, while the mouse is outside the window: dropping it there moves it
+    /// to a new window (#34, design X1).
+    tab_drag_outside: Option<usize>,
+    /// The subscription to each tab's events, dropped when the tab closes or moves away.
+    terminal_subscriptions: Vec<(EntityId, Subscription)>,
 }
 
 impl AppView {
     /// The window with one tab per folder of `dirs`, or one in the home folder.
     pub fn new(
         settings: Settings,
-        dirs: Vec<PathBuf>,
+        first: crate::FirstTabs,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
@@ -93,37 +98,14 @@ impl AppView {
             update: crate::state::update::UpdateState::default(),
             update_env: crate::state::update::UpdateEnv::detect(),
             _subscriptions: Vec::new(),
+            terminal_subscriptions: Vec::new(),
+            tab_drag_outside: None,
         };
         view.rebuild_profiles();
-        let default = view.profiles.default_profile().cloned();
-        if dirs.is_empty() {
-            view.open_tab(default.as_ref(), None, window, cx);
-        }
-        for dir in dirs {
-            // A folder from the command line wins over the profile's own.
-            let profile = default.clone().map(|profile| Profile {
-                cwd: None,
-                ..profile
-            });
-            view.open_tab(profile.as_ref(), Some(dir), window, cx);
-        }
-        view.tabs.activate(0);
-        view.focus_active(window, cx);
-        view.schedule_startup_update_check(cx);
-        // Debug hooks (AGENTS.md): start on the usage screen, or with Settings open on a page.
-        if std::env::var("TTERM_OPEN").is_ok_and(|open| open.trim() == "usage") {
-            view.open_usage(&OpenUsage, window, cx);
-        }
-        if let Some(category) = std::env::var("TTERM_OPEN")
-            .ok()
-            .and_then(|open| super::settings::Category::from_hook(&open))
-        {
-            view.settings_category = category;
-            let weak = cx.weak_entity();
-            window.defer(cx, move |window, cx| {
-                let _ = weak.update(cx, |view, cx| view.prepare_settings(window, cx));
-                super::settings::open(weak, window, cx)
-            });
+        match first {
+            crate::FirstTabs::Folders(dirs) => view.start_first_window(dirs, window, cx),
+            // A tab moved from another window (#34).
+            crate::FirstTabs::Moved(terminal) => view.adopt_tab(terminal, window, cx),
         }
         // Settings may follow the system theme: the terminal colors follow the mode.
         view._subscriptions
@@ -133,6 +115,46 @@ impl AppView {
                 }
             }));
         view
+    }
+
+    /// The first window's tabs, from the default profile or the folders of the command line,
+    /// then what only the first window does: the update check and the debug hooks.
+    fn start_first_window(
+        &mut self,
+        dirs: Vec<PathBuf>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let default = self.profiles.default_profile().cloned();
+        if dirs.is_empty() {
+            self.open_tab(default.as_ref(), None, window, cx);
+        }
+        for dir in dirs {
+            // A folder from the command line wins over the profile's own.
+            let profile = default.clone().map(|profile| Profile {
+                cwd: None,
+                ..profile
+            });
+            self.open_tab(profile.as_ref(), Some(dir), window, cx);
+        }
+        self.tabs.activate(0);
+        self.focus_active(window, cx);
+        self.schedule_startup_update_check(cx);
+        // Debug hooks (AGENTS.md): start on the usage screen, or with Settings open on a page.
+        if std::env::var("TTERM_OPEN").is_ok_and(|open| open.trim() == "usage") {
+            self.open_usage(&OpenUsage, window, cx);
+        }
+        if let Some(category) = std::env::var("TTERM_OPEN")
+            .ok()
+            .and_then(|open| super::settings::Category::from_hook(&open))
+        {
+            self.settings_category = category;
+            let weak = cx.weak_entity();
+            window.defer(cx, move |window, cx| {
+                let _ = weak.update(cx, |view, cx| view.prepare_settings(window, cx));
+                super::settings::open(weak, window, cx)
+            });
+        }
     }
 
     /// Rebuilds the profiles of the menus from the detected ones and the settings.
@@ -169,9 +191,58 @@ impl AppView {
             }
             view
         });
+        self.adopt_tab(terminal, window, cx);
+    }
+
+    /// Shows `terminal` as a new tab of this window, from `open_tab` or moved from another
+    /// window (#34), and focuses it.
+    fn adopt_tab(
+        &mut self,
+        terminal: Entity<TerminalView>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let subscription = cx.subscribe_in(&terminal, window, Self::on_terminal_event);
-        self._subscriptions.push(subscription);
+        self.terminal_subscriptions
+            .push((terminal.entity_id(), subscription));
+        terminal.update(cx, |terminal, cx| terminal.attach(window, cx));
         self.tabs.open(terminal);
+        self.focus_active(window, cx);
+        cx.notify();
+    }
+
+    /// Moves the tab at `index` to a new window, still running (#34, design X1): the shell, the
+    /// screen and the scrollback go with it. `at` is where the window opens, on the screen (a tab
+    /// dropped outside the window); the platform places it otherwise. The only tab stays.
+    pub(crate) fn move_tab_to_new_window(
+        &mut self,
+        index: usize,
+        at: Option<Point<Pixels>>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self.tabs.iter().count() < 2 {
+            return;
+        }
+        let Some(terminal) = self.tabs.close(index) else {
+            return;
+        };
+        let id = terminal.entity_id();
+        self.terminal_subscriptions.retain(|(tab, _)| *tab != id);
+        let size = window.bounds().size;
+        let bounds = at.map(|origin| WindowBounds::Windowed(Bounds::new(origin, size)));
+        let settings = self.settings.clone();
+        log::info!("moving a tab to a new window");
+        // The new window opens once this update ends: it builds a view of its own.
+        cx.defer(move |cx| {
+            crate::open_window(
+                cx,
+                settings,
+                crate::FirstTabs::Moved(terminal),
+                bounds,
+                None,
+            );
+        });
         self.focus_active(window, cx);
         cx.notify();
     }
@@ -198,7 +269,10 @@ impl AppView {
 
     fn close_tab_at(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
         // Dropping the view drops its pty, which ends the shell.
-        self.tabs.close(index);
+        if let Some(terminal) = self.tabs.close(index) {
+            let id = terminal.entity_id();
+            self.terminal_subscriptions.retain(|(tab, _)| *tab != id);
+        }
         if self.tabs.is_empty() {
             window.remove_window();
             return;
@@ -654,6 +728,22 @@ fn tab_menu(menu: PopupMenu, index: usize, view: &WeakEntity<AppView>, cx: &App)
         .map_or(0, |view| view.read(cx).tabs.iter().count());
     // Terminals have no unsaved state: the Close saved item of documents does not apply.
     let target = TabMenuTarget::new(index, &vec![false; count]);
+    // Moving the only tab would leave an empty window: the item shows with two tabs or more.
+    let move_view = view.clone();
+    let menu = if count > 1 {
+        menu.item(
+            PopupMenuItem::new(t!("tabs.move_to_new_window"))
+                .action(Box::new(MoveTabToNewWindow))
+                .on_click(move |_, window, cx| {
+                    let _ = move_view.update(cx, |view, cx| {
+                        view.move_tab_to_new_window(index, None, window, cx)
+                    });
+                }),
+        )
+        .separator()
+    } else {
+        menu
+    };
     [
         CloseScope::This,
         CloseScope::Others,
@@ -676,7 +766,6 @@ fn tab_menu(menu: PopupMenu, index: usize, view: &WeakEntity<AppView>, cx: &App)
     })
 }
 
-/// A 28 px icon button of the bar.
 /// The tooltip of a tab (design A5): the full title, the folder and the profile, for names cut
 /// short in a crowded bar.
 fn tab_tooltip(info: TabHover, window: &mut Window, cx: &mut App) -> AnyView {
@@ -712,6 +801,7 @@ fn tab_tooltip(info: TabHover, window: &mut Window, cx: &mut App) -> AnyView {
     .build(window, cx)
 }
 
+/// A 28 px icon button of the bar.
 fn bar_button(id: &'static str, icon: IconName, palette: &Palette) -> Stateful<Div> {
     let (hover, pressed) = (palette.hover, palette.pressed);
     div()
@@ -762,6 +852,32 @@ impl Render for AppView {
             .on_action(cx.listener(Self::new_tab))
             .on_action(cx.listener(Self::open_profile))
             .on_action(cx.listener(Self::close_tab))
+            // A tab dragged out of the window and dropped there opens in a window of its own
+            // where it is dropped (#34, design X1).
+            .on_drag_move(
+                cx.listener(|view, event: &DragMoveEvent<DraggedTab>, window, cx| {
+                    let inside = Bounds::new(point(px(0.0), px(0.0)), window.viewport_size())
+                        .contains(&event.event.position);
+                    view.tab_drag_outside = (!inside).then(|| event.drag(cx).index);
+                }),
+            )
+            .on_mouse_up_out(
+                MouseButton::Left,
+                cx.listener(|view, event: &MouseUpEvent, window, cx| {
+                    if let Some(index) = view.tab_drag_outside.take() {
+                        let at = window.bounds().origin + event.position;
+                        view.move_tab_to_new_window(index, Some(at), window, cx);
+                    }
+                }),
+            )
+            .on_mouse_up(
+                MouseButton::Left,
+                cx.listener(|view, _, _, _| view.tab_drag_outside = None),
+            )
+            .on_action(cx.listener(|view, _: &MoveTabToNewWindow, window, cx| {
+                let index = view.tabs.active_index();
+                view.move_tab_to_new_window(index, None, window, cx);
+            }))
             .on_action(cx.listener(Self::next_tab))
             .on_action(cx.listener(Self::previous_tab))
             .on_action(cx.listener(Self::zoom_in))

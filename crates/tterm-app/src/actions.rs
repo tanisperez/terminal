@@ -44,6 +44,8 @@ actions!(
         OpenUsage,
         /// Closes the agent usage screen (`Esc`).
         CloseUsage,
+        /// Moves the active tab to a new window, still running (`Ctrl+Shift+N`, `Cmd+Shift+N`).
+        MoveTabToNewWindow,
     ]
 );
 
@@ -112,6 +114,7 @@ pub fn bind_keys(cx: &mut App) {
         KeyBinding::new("cmd-t", NewTab, context),
         KeyBinding::new("cmd-shift-space", OpenProfilePicker, context),
         KeyBinding::new("cmd-w", CloseTab, context),
+        KeyBinding::new("cmd-shift-n", MoveTabToNewWindow, context),
         KeyBinding::new("ctrl-tab", NextTab, context),
         KeyBinding::new("ctrl-shift-tab", PreviousTab, context),
         KeyBinding::new("cmd-shift-]", NextTab, context),
@@ -129,6 +132,7 @@ pub fn bind_keys(cx: &mut App) {
         KeyBinding::new("ctrl-shift-t", NewTab, context),
         KeyBinding::new("ctrl-shift-space", OpenProfilePicker, context),
         KeyBinding::new("ctrl-shift-w", CloseTab, context),
+        KeyBinding::new("ctrl-shift-n", MoveTabToNewWindow, context),
         KeyBinding::new("ctrl-tab", NextTab, context),
         KeyBinding::new("ctrl-shift-tab", PreviousTab, context),
         KeyBinding::new("ctrl-pagedown", NextTab, context),

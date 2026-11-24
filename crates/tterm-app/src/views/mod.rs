@@ -11,6 +11,7 @@ mod update;
 mod usage;
 
 pub use root::AppView;
+pub use terminal::TerminalView;
 
 /// Binds the keys of the views' own contexts.
 pub fn bind_keys(cx: &mut gpui_kit::App) {
