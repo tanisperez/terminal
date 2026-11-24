@@ -374,10 +374,18 @@ impl TerminalView {
 
     /// The agent this tab runs in its foreground (Claude Code), for the usage screen.
     pub fn agent(&self) -> Option<super::usage::AgentTab> {
-        let foreground = self.pty.as_ref()?.foreground()?;
-        (foreground.name == "claude").then(|| super::usage::AgentTab {
+        let pty = self.pty.as_ref()?;
+        // Linux knows the program in the foreground (`/proc`); elsewhere the agent is looked
+        // for among the shell's descendants (#38).
+        #[cfg(target_os = "linux")]
+        let found = pty.foreground().filter(|program| program.name == "claude");
+        #[cfg(any(windows, target_os = "macos"))]
+        let found = pty.descendant_named(&["claude"]);
+        #[cfg(not(any(target_os = "linux", windows, target_os = "macos")))]
+        let found: Option<tterm_term::pty::Foreground> = None;
+        found.map(|program| super::usage::AgentTab {
             label: self.label(),
-            cwd: foreground.cwd,
+            cwd: program.cwd,
         })
     }
 

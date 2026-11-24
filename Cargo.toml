@@ -11,6 +11,7 @@ license = "Apache-2.0"
 authors = ["Estanislao Pérez Nartallo <tanisperez@gmail.com>"]
 
 [workspace.dependencies]
+sysinfo = { version = "0.40", default-features = false, features = ["system"] }
 gpui-kit = "0.10.0"
 # The design system and standard components shared with Postino, ted, Vano and Nastro. Same
 # gpui-kit pin.

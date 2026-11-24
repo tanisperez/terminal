@@ -220,6 +220,42 @@ impl Pty {
         }
     }
 
+    /// The program named one of `names` (case insensitive, `.exe` ignored) that runs under the
+    /// tab's shell, at any depth, with its folder: how the usage screen finds an agent in a tab
+    /// where `/proc` does not exist (#38, Windows and macOS). It reads the process table, some
+    /// milliseconds: only for the usage screen. A WSL tab runs its programs inside the
+    /// distribution, out of sight of Windows.
+    #[cfg(any(windows, target_os = "macos"))]
+    pub fn descendant_named(&self, names: &[&str]) -> Option<Foreground> {
+        use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
+        let root = Pid::from_u32(self.child.process_id()?);
+        let mut system = System::new().ok()?;
+        system.refresh_processes_specifics(
+            ProcessesToUpdate::All,
+            true,
+            ProcessRefreshKind::nothing().with_cwd(UpdateKind::Always),
+        );
+        let processes = system.processes();
+        let under_root = |mut pid: Pid| {
+            for _ in 0..64 {
+                match processes.get(&pid).and_then(|process| process.parent()) {
+                    Some(parent) if parent == root => return true,
+                    Some(parent) => pid = parent,
+                    None => return false,
+                }
+            }
+            false
+        };
+        processes.iter().find_map(|(pid, process)| {
+            let name = process.name().to_string_lossy().to_lowercase();
+            let name = name.strip_suffix(".exe").unwrap_or(&name).to_string();
+            (names.contains(&name.as_str()) && under_root(*pid)).then(|| Foreground {
+                name,
+                cwd: process.cwd().map(PathBuf::from),
+            })
+        })
+    }
+
     /// The process id of the program, when the platform has one.
     pub fn pid(&self) -> Option<u32> {
         self.child.process_id()

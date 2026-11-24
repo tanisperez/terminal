@@ -22,5 +22,7 @@ description: How Tanis Terminal helps with coding agents such as Claude Code: sc
 <ul>
     <li>The numbers come from Claude Code's logs on your computer (<code>~/.claude/projects</code>). Only the usage figures are read, never the content of your sessions, and nothing is sent anywhere.</li>
     <li>Input tokens include the ones read from and written to the cache; the tooltip of each bar breaks them down.</li>
+    <li>On Windows, the logs of the WSL distributions that are running count too.</li>
+    <li>The tabs where it runs now are found on Linux, Windows and macOS. In a WSL tab, Claude Code runs inside the distribution, where Windows cannot see it: such a tab is not listed yet.</li>
     <li>Other agents are not counted yet.</li>
 </ul>

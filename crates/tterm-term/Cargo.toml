@@ -16,6 +16,10 @@ log = { workspace = true }
 [target.'cfg(unix)'.dependencies]
 nix = { workspace = true }
 
+# The programs a tab runs, on the systems without /proc (#38).
+[target.'cfg(any(windows, target_os = "macos"))'.dependencies]
+sysinfo = { workspace = true }
+
 [dev-dependencies]
 pretty_assertions = { workspace = true }
 
