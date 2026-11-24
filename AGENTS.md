@@ -84,12 +84,17 @@ Expo/React Native conventions here.
   written; the user's own ones are `[[profiles]]` tables (`name`, `shell`, `cwd`, `startup`,
   `color`, `shortcut`), plus `default_profile` and `hidden_profiles`. `startup` is typed into the
   shell instead of replacing it, so the tab stays open when the program exits.
+- Milestone 0.2.0 (decided on 2026-11-24): split panes, horizontal and vertical (#33); moving a
+  tab to its own window (#34); a configurable color palette whose default is the author's kitty
+  one (#30); background transparency, off by default (#31); a start folder for the first tab,
+  with new tabs inheriting the active tab's folder unless Settings says otherwise (#28); Nerd
+  Font icons in the bundled fonts, CaskaydiaCove Nerd Font Mono by default (#35). Each one is
+  designed in the Artifact first.
 
 ## Pending decisions (ask before choosing)
 
 - Agents other than Claude Code in the usage screen.
 - Environment variables per profile.
-- Splits: not in the design; ask before designing them.
 
 ## Architecture
 
