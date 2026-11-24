@@ -1,0 +1,9 @@
+# The shell of the website screenshots: a short two line prompt, colored by the terminal palette.
+PS1='\[\e[34m\]\w\[\e[0m\] \[\e[32m\]main\[\e[0m\]\n\[\e[92m\]❯\[\e[0m\] '
+export LS_COLORS='di=1;34:ex=92:*.png=95:*.md=0'
+alias ls='ls --color=auto'
+# The tab is named after the shell and its folder, never the user or the machine.
+PROMPT_COMMAND=('printf "\033]0;bash · %s\007" "${PWD##*/}"')
+# What the tab shows when it opens: the fake agent for the usage screenshot, or canned output.
+# Job control first, so the agent becomes the program in the foreground, as when typed.
+if [ -n "${TTERM_DEMO_CLAUDE:-}" ]; then set -m; claude 3600; else show; fi
