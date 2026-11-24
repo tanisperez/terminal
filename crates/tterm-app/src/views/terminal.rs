@@ -46,6 +46,9 @@ const BLINK_INTERVAL: std::time::Duration = std::time::Duration::from_millis(500
 /// Blinks before the cursor stays shown without typing: 15 s, kitty's default
 /// `cursor_stop_blinking_after`, so an idle terminal does no work.
 const BLINKS: u32 = 30;
+/// How long a key waits to show a cursor the blink had hidden, when the shell does not answer
+/// first. The echo usually comes within 2 ms and shows it in the same frame.
+const REVEAL_DELAY: std::time::Duration = std::time::Duration::from_millis(30);
 /// How long the size stays after the last change of a resize (design C).
 const RESIZE_SHOWN: std::time::Duration = std::time::Duration::from_millis(600);
 /// How long the size takes to fade out.
@@ -117,6 +120,8 @@ pub struct TerminalView {
     blink_hidden: bool,
     /// The blinking that runs while the user types; replaced (and so stopped) on every key.
     _blink: Task<()>,
+    /// Shows a cursor hidden by the blink after a key, if the shell's echo did not.
+    _reveal: Task<()>,
     /// The link under the mouse while Ctrl (Cmd on macOS) is held, underlined.
     hover_link: Option<Link>,
     /// The grid's place in the view (padding plus centering) and its size, for the resize
@@ -207,6 +212,7 @@ impl TerminalView {
             cursor_blink: settings.cursor_blink,
             blink_hidden: false,
             _blink: Task::ready(()),
+            _reveal: Task::ready(()),
             hover_link: None,
             grid_local: Bounds::default(),
             grid_area: Size::default(),
@@ -488,8 +494,17 @@ impl TerminalView {
         }
         self.write(bytes);
         if self.cursor_blink {
+            // A frame painted before the echo arrives makes the echo wait for the compositor's
+            // next frame callback on Wayland (up to 16 ms at 60 Hz). So the cursor the blink had
+            // hidden is shown with the echo's frame, or after a short wait when none comes.
+            let hidden = self.blink_hidden;
             self.restart_blink(cx);
-            cx.notify();
+            if hidden {
+                self._reveal = cx.spawn(async move |view, cx| {
+                    cx.background_executor().timer(REVEAL_DELAY).await;
+                    view.update(cx, |_, cx| cx.notify()).ok();
+                });
+            }
         }
         if !self.frame.scroll.at_bottom() {
             self.emulator.scroll_to_bottom();
@@ -1651,11 +1666,12 @@ impl EntityInputHandler for TerminalView {
         _window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        self.preedit = None;
+        if self.preedit.take().is_some() {
+            cx.notify();
+        }
         if !text.is_empty() {
             self.send_input(text.as_bytes(), cx);
         }
-        cx.notify();
     }
 
     fn replace_and_mark_text_in_range(
