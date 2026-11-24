@@ -371,28 +371,47 @@ pub fn parse_wsl_list(output: &[u8]) -> Vec<String> {
         .collect()
 }
 
+/// The WSL distributions `wsl.exe` lists with `args` (`-l -q`, `-l --running -q`); empty when
+/// WSL is missing.
+fn wsl_list(args: &[&str]) -> Vec<String> {
+    let mut command = std::process::Command::new("wsl.exe");
+    command.args(args);
+    // No console window flashing from a GUI app.
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt as _;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+    command
+        .output()
+        .map(|output| parse_wsl_list(&output.stdout))
+        .unwrap_or_default()
+}
+
+/// The root of every running WSL distribution as Windows sees it (`\\wsl.localhost\Ubuntu`),
+/// for the usage screen to read the agents' logs there. Stopped ones are left out: reading
+/// their files would start them. Empty outside Windows.
+pub fn running_wsl_roots() -> Vec<std::path::PathBuf> {
+    if !cfg!(windows) {
+        return Vec::new();
+    }
+    wsl_list(&["-l", "--running", "-q"])
+        .into_iter()
+        .map(|distro| std::path::PathBuf::from(format!(r"\\wsl.localhost\{distro}")))
+        .collect()
+}
+
 /// The profiles of this machine. On Windows it runs `wsl.exe -l -q` (about 50 ms).
 pub fn detect(command_prompt_name: &str) -> Vec<Profile> {
     if cfg!(windows) {
         let mut found: Vec<Profile> = Vec::new();
-        let mut command = std::process::Command::new("wsl.exe");
-        command.args(["-l", "-q"]);
-        // No console window flashing from a GUI app.
-        #[cfg(windows)]
-        {
-            use std::os::windows::process::CommandExt as _;
-            const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-            command.creation_flags(CREATE_NO_WINDOW);
-        }
-        let output = command.output();
-        if let Ok(output) = output {
-            for distro in parse_wsl_list(&output.stdout) {
-                found.push(Profile::detected(
-                    &distro,
-                    vec!["wsl.exe".into(), "-d".into(), distro.clone()],
-                    Some("WSL"),
-                ));
-            }
+        for distro in wsl_list(&["-l", "-q"]) {
+            found.push(Profile::detected(
+                &distro,
+                vec!["wsl.exe".into(), "-d".into(), distro.clone()],
+                Some("WSL"),
+            ));
         }
         let pwsh = which("pwsh.exe").is_some();
         found.push(Profile::detected(

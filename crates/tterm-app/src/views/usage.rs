@@ -75,8 +75,13 @@ impl UsageView {
             let files = cx
                 .background_spawn(async move {
                     let started = std::time::Instant::now();
+                    let roots = crate::state::profiles::running_wsl_roots();
                     let files = std::env::home_dir()
-                        .map(|home| tterm_usage::read_claude_code(&home))
+                        .map(|home| {
+                            tterm_usage::read_claude_code(&tterm_usage::claude_code_dirs(
+                                &home, &roots,
+                            ))
+                        })
                         .unwrap_or_default();
                     log::info!(
                         "read {} agent logs in {} ms",

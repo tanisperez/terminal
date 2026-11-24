@@ -8,7 +8,7 @@ fn main() {
         return;
     };
     let started = Instant::now();
-    let files = tterm_usage::read_claude_code(&home);
+    let files = tterm_usage::read_claude_code(&tterm_usage::claude_code_dirs(&home, &[]));
     let read = started.elapsed();
     let offset = *chrono::Local::now().offset();
     let today = chrono::Local::now().date_naive();

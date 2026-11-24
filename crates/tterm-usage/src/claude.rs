@@ -20,6 +20,23 @@ pub fn projects_dir(home: &Path) -> PathBuf {
     home.join(".claude").join("projects")
 }
 
+/// The folders of Claude Code's logs in a Linux file system seen from outside, such as a WSL
+/// distribution from Windows (`\\wsl.localhost\Ubuntu`): `/root` and every `/home/<user>`.
+/// Only the folders that exist.
+pub fn projects_dirs_in(root: &Path) -> Vec<PathBuf> {
+    let mut homes = vec![root.join("root")];
+    if let Ok(entries) = std::fs::read_dir(root.join("home")) {
+        let mut users: Vec<PathBuf> = entries.flatten().map(|entry| entry.path()).collect();
+        users.sort();
+        homes.extend(users);
+    }
+    homes
+        .iter()
+        .map(|home| projects_dir(home))
+        .filter(|dir| dir.is_dir())
+        .collect()
+}
+
 /// Every `.jsonl` file under `dir`, at any depth.
 pub fn log_files(dir: &Path) -> Vec<PathBuf> {
     let mut found = Vec::new();
@@ -186,5 +203,23 @@ not json
         File::create(dir.path().join("a/notes.md")).unwrap();
         assert_eq!(log_files(dir.path()).len(), 2);
         assert!(log_files(&dir.path().join("missing")).is_empty());
+    }
+
+    #[test]
+    fn the_logs_of_a_linux_file_system_are_in_root_and_every_home() {
+        let dir = tempfile::tempdir().unwrap();
+        for home in ["root", "home/ana", "home/bob"] {
+            std::fs::create_dir_all(dir.path().join(home).join(".claude/projects")).unwrap();
+        }
+        std::fs::create_dir_all(dir.path().join("home/eve")).unwrap();
+        assert_eq!(
+            projects_dirs_in(dir.path()),
+            vec![
+                dir.path().join("root/.claude/projects"),
+                dir.path().join("home/ana/.claude/projects"),
+                dir.path().join("home/bob/.claude/projects"),
+            ]
+        );
+        assert!(projects_dirs_in(&dir.path().join("missing")).is_empty());
     }
 }

@@ -8,7 +8,7 @@
 pub mod claude;
 
 use std::collections::{BTreeMap, HashMap};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, Duration, FixedOffset, NaiveDate, Utc};
 
@@ -65,10 +65,23 @@ pub struct FileUsage {
     pub prompts: Vec<Prompt>,
 }
 
-/// Reads every Claude Code log of the user. Slow with months of logs: call it off the main
-/// thread. Unreadable files are skipped.
-pub fn read_claude_code(home: &Path) -> Vec<FileUsage> {
-    claude::log_files(&claude::projects_dir(home))
+/// The folders of Claude Code's logs: the user's own (`~/.claude/projects`), then those found in
+/// other Linux file systems seen from here, such as the running WSL distributions on Windows
+/// (see [`claude::projects_dirs_in`]).
+pub fn claude_code_dirs(home: &Path, linux_roots: &[PathBuf]) -> Vec<PathBuf> {
+    let mut dirs = vec![claude::projects_dir(home)];
+    for root in linux_roots {
+        dirs.extend(claude::projects_dirs_in(root));
+    }
+    dirs
+}
+
+/// Reads every Claude Code log in `dirs` (see [`claude_code_dirs`]). Slow with months of logs:
+/// call it off the main thread. Unreadable files are skipped.
+pub fn read_claude_code(dirs: &[PathBuf]) -> Vec<FileUsage> {
+    dirs.iter()
+        .flat_map(|dir| claude::log_files(dir))
+        .collect::<Vec<_>>()
         .iter()
         .filter_map(|path| match claude::read_file(path) {
             Ok(mut usage) => {
