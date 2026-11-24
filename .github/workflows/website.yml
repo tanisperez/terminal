@@ -35,9 +35,10 @@ jobs:
       - name: Build the documentation
         run: python3 site/docs-src/build.py
 
-      # site/docs-src holds the sources of site/docs, not pages.
+      # site/docs-src holds the sources of site/docs and site/screenshots the capture script, not
+      # pages.
       - name: Assemble the site
-        run: rsync -a --exclude docs-src/ --exclude README.md site/ _site/
+        run: rsync -a --exclude docs-src/ --exclude screenshots/ --exclude README.md site/ _site/
 
       # The download buttons point at the files of the latest stable release, and the pages show
       # its version. Without a stable release they keep linking to the releases page.
