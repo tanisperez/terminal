@@ -62,6 +62,17 @@ pub struct ColorScheme {
     /// The 16 ANSI colors: black, red, green, yellow, blue, magenta, cyan, white, then the
     /// bright ones in the same order.
     pub ansi: [Rgb; 16],
+    /// How selected cells look.
+    pub selection: SelectionStyle,
+}
+
+/// How selected cells look (#30).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SelectionStyle {
+    /// Text and background swap, as kitty's `selection_background none`.
+    Invert,
+    /// This background under the cell's own text.
+    Color(Rgb),
 }
 
 /// The cursor shape a terminal starts with, until a program asks for another one.
@@ -115,6 +126,8 @@ pub struct Emulator {
     anchor: Option<TrackedGridRef>,
     /// Whether the drag started on the left half of the anchor's cell.
     anchor_left: bool,
+    /// How selected cells look.
+    selection: SelectionStyle,
 }
 
 /// How a selection grows from where the mouse was pressed.
@@ -161,6 +174,7 @@ impl Emulator {
             size,
             anchor: None,
             anchor_left: true,
+            selection: colors.selection,
         };
         emulator.set_colors(colors)?;
         emulator.set_cursor_style(cursor)?;
@@ -179,6 +193,11 @@ impl Emulator {
             .set_default_bg_color(Some(to_vt(colors.background)))?
             .set_default_cursor_color(Some(to_vt(colors.cursor)))?
             .set_default_color_palette(Some(palette))?;
+        if self.selection != colors.selection {
+            self.selection = colors.selection;
+            // Every selected cell changes color: the next frame rebuilds every line.
+            self.frame.lines.clear();
+        }
         Ok(())
     }
 
@@ -493,6 +512,7 @@ impl Emulator {
             rows,
             cells,
             frame,
+            selection: selection_style,
             ..
         } = self;
         let snapshot = render.update(terminal)?;
@@ -524,8 +544,10 @@ impl Emulator {
             while let Some(row) = row_iter.next() {
                 if y < lines.len() && (full || row.dirty()?) {
                     let line = {
+                        let selected = row.selection()?.map(|range| (range.start_x, range.end_x));
                         let mut cell_iter = cells.update(row)?;
-                        let mut builder = LineBuilder::new(foreground, background);
+                        let mut builder =
+                            LineBuilder::new(foreground, background, *selection_style, selected);
                         while let Some(cell) = cell_iter.next() {
                             let wide = cell.raw_cell()?.wide()?;
                             if matches!(wide, CellWide::SpacerTail | CellWide::SpacerHead) {
@@ -550,7 +572,7 @@ impl Emulator {
                             });
                         }
                         let mut line = builder.finish();
-                        line.selection = row.selection()?.map(|range| (range.start_x, range.end_x));
+                        line.selection = selected;
                         line
                     };
                     lines[y] = Arc::new(line);
@@ -604,6 +626,9 @@ struct CellData {
 struct LineBuilder {
     foreground: Rgb,
     background: Rgb,
+    selection: SelectionStyle,
+    /// The selected columns of the line, inclusive.
+    selected: Option<(u16, u16)>,
     col: u16,
     line: Line,
     /// Whether the last run may take the next cell (it is not a wide character).
@@ -611,10 +636,17 @@ struct LineBuilder {
 }
 
 impl LineBuilder {
-    fn new(foreground: Rgb, background: Rgb) -> Self {
+    fn new(
+        foreground: Rgb,
+        background: Rgb,
+        selection: SelectionStyle,
+        selected: Option<(u16, u16)>,
+    ) -> Self {
         Self {
             foreground,
             background,
+            selection,
+            selected,
             col: 0,
             line: Line::default(),
             open: false,
@@ -637,6 +669,19 @@ impl LineBuilder {
         }
         if cell.invisible {
             fg = bg.unwrap_or(self.background);
+        }
+        let selected = self
+            .selected
+            .is_some_and(|(start, end)| (start..=end).contains(&self.col));
+        if selected {
+            match self.selection {
+                SelectionStyle::Invert => {
+                    let old_fg = fg;
+                    fg = bg.unwrap_or(self.background);
+                    bg = Some(old_fg);
+                }
+                SelectionStyle::Color(color) => bg = Some(color),
+            }
         }
         let cells = if cell.wide { 2 } else { 1 };
         if let Some(color) = bg.filter(|color| *color != self.background) {
@@ -841,6 +886,7 @@ mod tests {
             Rgb::hex(0x86d9e3),
             Rgb::hex(0xffffff),
         ],
+        selection: SelectionStyle::Invert,
     };
 
     fn emulator(cols: u16, rows: u16) -> Emulator {
@@ -1092,6 +1138,39 @@ mod tests {
             drag_cells(at(2, 1, true), at(0, 0, true), 20),
             Some(((0, 0), (1, 1)))
         );
+    }
+
+    #[test]
+    fn selected_cells_swap_text_and_background_or_take_the_selection_color() {
+        let mut term = emulator(20, 2);
+        term.feed(b"ab cd");
+        term.frame().unwrap();
+        term.select_start(0, 0, true, SelectionUnit::Cell).unwrap();
+        term.select_to(2, 0, false).unwrap();
+        let line = term.frame().unwrap().lines[0].clone();
+        // "ab " inverted: the text in the background color on a foreground span.
+        assert_eq!(line.runs[0].text, "ab");
+        assert_eq!(line.runs[0].fg, SCHEME.background);
+        assert_eq!(
+            line.backgrounds,
+            vec![BgSpan {
+                col: 0,
+                cells: 3,
+                color: SCHEME.foreground
+            }]
+        );
+        assert_eq!(line.runs[1].fg, SCHEME.foreground);
+        // A selection color keeps the text and paints the background.
+        let blue = Rgb::hex(0x264f78);
+        term.set_colors(&ColorScheme {
+            selection: SelectionStyle::Color(blue),
+            ..SCHEME
+        })
+        .unwrap();
+        let line = term.frame().unwrap().lines[0].clone();
+        assert_eq!(line.runs[0].fg, SCHEME.foreground);
+        assert_eq!(line.backgrounds[0].color, blue);
+        assert_eq!(line.backgrounds[0].cells, 3);
     }
 
     #[test]

@@ -32,6 +32,17 @@ description: Every setting of Tanis Terminal, in the Settings window and in sett
 </table>
 <p>Noto Sans Mono, JetBrains Mono, Cascadia Code, Fira Code and Geist Mono come with Tanis Terminal and work on every system; the font list also offers the monospace fonts you have installed.</p>
 
+<h2 id="colors">Colors</h2>
+<p>Settings, Colors changes the colors of the dark theme: the 16 colors programs ask for (black, red, green, yellow, blue, magenta, cyan and white, normal and bright), the background, the text, the cursor and the selection. Click a color, then pick another one or type its hex value. <strong>Reset</strong> goes back to the default palette. The light theme keeps its own colors.</p>
+<p>Only the colors you change are written, in a <code>[colors]</code> table:</p>
+```toml title="settings.toml"
+[colors]
+background = "#101010"
+color4 = "#3355ff"
+selection = "#264f78"
+```
+<p>Keys are <code>color0</code> to <code>color15</code>, <code>background</code>, <code>foreground</code>, <code>cursor</code> and <code>selection</code>, with <code>#rrggbb</code> values. <code>selection = "invert"</code>, the default, swaps the text and background colors of the selected cells. The default palette is <code>#000000 #cc0403 #19cb00 #cecb00 #0d73cc #cb1ed1 #0dcdcd #dddddd</code>, then the bright ones <code>#767676 #f2201f #23fd00 #fffd00 #1a8fff #fd28ff #14ffff #ffffff</code>, text <code>#dddddd</code> on <code>#000000</code> and a <code>#cccccc</code> cursor.</p>
+
 <h2 id="profiles">Profiles</h2>
 <p>Settings, Profiles edits them; in the file they look like this:</p>
 ```toml title="settings.toml"

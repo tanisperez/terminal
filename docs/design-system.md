@@ -20,20 +20,24 @@ metrics of its own layout.
 
 ## Terminal colors
 
-The ground is pure black, not telaio's `bg`: the terminal is the whole window.
+The ground is pure black, not telaio's `bg`: the terminal is the whole window. In the dark
+theme the terminal takes the author's kitty palette (#30, `state::colors::KITTY`), which the
+user changes color by color in Settings, Colors (`[colors]` in `settings.toml`). The light
+theme keeps `LIGHT_SCHEME` (`theme/palette.rs`).
 
-| Use | Dark | Light |
+| Use | Dark (kitty) | Light |
 | --- | --- | --- |
-| Terminal background, active tab | `#0b0b0f` | `#ffffff` |
-| Terminal text | `#e9eaee` | `#1f2029` |
-| Cursor | `#5b63e6` | `#4f57d8` |
+| Terminal background, active tab | `#000000` | `#ffffff` |
+| Terminal text | `#dddddd` | `#1f2029` |
+| Cursor | `#cccccc` | `#4f57d8` |
+| Selection | inverted | `#d9dcff` |
 | Tab bar | `#111115` | `#f3f4f6` |
 | Line under the bar, around the active tab | `#23252c` | `#e3e5ea` |
 | Line between inactive tabs | `#1c1d23` | `#eaecf0` |
 
-The 16 ANSI colors (`DARK_SCHEME`, `LIGHT_SCHEME` in `theme/palette.rs`) take the design's hues:
-red `#f27171`, green `#4fc88f`, yellow `#e8b75a`, blue `#7a80eb` and bright blue `#a3a9ff`,
-bright black `#8b8e9a`. Programs may change them for a while (OSC 4, 10, 11, 12).
+The 16 ANSI colors of the dark theme are kitty's: `#000000 #cc0403 #19cb00 #cecb00 #0d73cc
+#cb1ed1 #0dcdcd #dddddd`, bright `#767676 #f2201f #23fd00 #fffd00 #1a8fff #fd28ff #14ffff
+#ffffff`. Programs may change them for a while (OSC 4, 10, 11, 12).
 
 ## Metrics
 

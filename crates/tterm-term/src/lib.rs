@@ -18,7 +18,8 @@ pub mod key;
 pub mod pty;
 
 pub use emulator::{
-    ColorScheme, CursorStyleChoice, Effect, Emulator, Error, GridSize, SelectionUnit,
+    ColorScheme, CursorStyleChoice, Effect, Emulator, Error, GridSize, SelectionStyle,
+    SelectionUnit,
 };
 pub use frame::{BgSpan, Cursor, CursorShape, Frame, Line, Rgb, Run, ScrollState};
 pub use key::{KeyInput, Modifiers, MouseAction, MouseButton, MouseInput};

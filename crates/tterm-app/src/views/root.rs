@@ -44,6 +44,8 @@ pub struct AppView {
     pub(crate) profile_selection: Option<super::settings_profiles::ProfileSelection>,
     /// The fields of the user's profile being edited.
     pub(crate) profile_editor: Option<super::settings_profiles::ProfileEditor>,
+    /// The color being edited on the Colors page of Settings.
+    pub(crate) color_editor: Option<super::settings_colors::ColorEditor>,
     /// The profiles of the menus, from `detected` and the settings.
     pub(crate) profiles: Profiles,
     /// The font size of this session: Settings' size, changed by the zoom shortcuts.
@@ -79,6 +81,7 @@ impl AppView {
             detected,
             profile_selection: None,
             profile_editor: None,
+            color_editor: None,
             profiles: Profiles::default(),
             font_size,
             settings_category: super::settings::Category::default(),
@@ -527,7 +530,7 @@ impl AppView {
             .cursor_pointer()
             .map(|tab| {
                 if active {
-                    tab.bg(palette.terminal_bg())
+                    tab.bg(crate::theme::palette::terminal_bg(cx))
                         .border_color(palette.tab_bar_border())
                         .text_color(palette.fg)
                         .font_weight(FontWeight::MEDIUM)
@@ -612,7 +615,7 @@ impl Render for DraggedTab {
             .rounded(px(RADIUS_SM))
             .border_1()
             .border_color(palette.border_strong)
-            .bg(palette.terminal_bg())
+            .bg(crate::theme::palette::terminal_bg(cx))
             .shadow(palette.shadow.clone())
             .opacity(0.9)
             .text_size(px(12.5))
@@ -732,7 +735,7 @@ impl Render for AppView {
             .key_context(CONTEXT)
             .relative()
             .size_full()
-            .bg(palette.terminal_bg())
+            .bg(crate::theme::palette::terminal_bg(cx))
             .text_color(palette.fg)
             .on_action(cx.listener(Self::new_tab))
             .on_action(cx.listener(Self::open_profile))

@@ -1,0 +1,65 @@
+# The Colors page of Settings (#30, design F3).
+_version: 2
+"colors.scheme":
+  en: "Scheme"
+  es: "Esquema"
+"colors.scheme_description":
+  en: "The colors programs ask for (ls, git, vim) in the dark theme. Saved in settings.toml."
+  es: "Los colores que piden los programas (ls, git, vim) en el tema oscuro. Se guardan en settings.toml."
+"colors.kitty":
+  en: "kitty"
+  es: "kitty"
+"colors.reset":
+  en: "Reset"
+  es: "Restablecer"
+"colors.normal":
+  en: "Normal"
+  es: "Normal"
+"colors.bright":
+  en: "Bright"
+  es: "Brillante"
+"colors.bright_name":
+  en: "Bright %{name}"
+  es: "%{name} brillante"
+"colors.black":
+  en: "Black"
+  es: "Negro"
+"colors.red":
+  en: "Red"
+  es: "Rojo"
+"colors.green":
+  en: "Green"
+  es: "Verde"
+"colors.yellow":
+  en: "Yellow"
+  es: "Amarillo"
+"colors.blue":
+  en: "Blue"
+  es: "Azul"
+"colors.magenta":
+  en: "Magenta"
+  es: "Magenta"
+"colors.cyan":
+  en: "Cyan"
+  es: "Cian"
+"colors.white":
+  en: "White"
+  es: "Blanco"
+"colors.background":
+  en: "Background"
+  es: "Fondo"
+"colors.foreground":
+  en: "Text"
+  es: "Texto"
+"colors.cursor":
+  en: "Cursor"
+  es: "Cursor"
+"colors.selection":
+  en: "Selection"
+  es: "Selección"
+"colors.invert":
+  en: "Invert"
+  es: "Invertir"
+"colors.preview":
+  en: "Preview"
+  es: "Vista previa"

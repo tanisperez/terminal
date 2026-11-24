@@ -24,12 +24,12 @@ use crate::state::drop::{DropPreview, size_label};
 use crate::state::links::{self, Link};
 use crate::state::profiles::{Origin, Profile};
 use crate::state::settings::Settings;
+use crate::theme::PaletteExt as _;
 use crate::theme::metrics::{
     CURSOR_THICKNESS, PIXELS_PER_POINT, SCROLL_INDICATOR_WIDTH, TERMINAL_PADDING_X,
     TERMINAL_PADDING_Y,
 };
 use crate::theme::palette::rgb;
-use crate::theme::{PaletteExt as _, TerminalColors as _};
 use gpui_kit::component::menu::{ContextMenuExt as _, PopupMenu, PopupMenuItem};
 use rust_i18n::t;
 
@@ -168,9 +168,10 @@ impl TerminalView {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
-        let scheme = cx.palette().scheme();
+        let scheme = crate::theme::palette::scheme(cx);
         let size = GridSize::default();
-        let emulator = match Emulator::new(size, scheme, settings.cursor.into(), SCROLLBACK_BYTES) {
+        let emulator = match Emulator::new(size, &scheme, settings.cursor.into(), SCROLLBACK_BYTES)
+        {
             Ok(emulator) => emulator,
             // libghostty-vt fails only without memory: nothing sensible is left to do.
             #[allow(clippy::panic)]
@@ -362,7 +363,7 @@ impl TerminalView {
 
     /// Repaints with the colors of the current theme mode.
     pub fn apply_colors(&mut self, cx: &mut Context<Self>) {
-        if let Err(error) = self.emulator.set_colors(cx.palette().scheme()) {
+        if let Err(error) = self.emulator.set_colors(&crate::theme::palette::scheme(cx)) {
             log::warn!("colors not changed: {error}");
         }
         self.refresh_frame();
@@ -1080,7 +1081,6 @@ impl Render for TerminalView {
             blink_hidden: self.blink_hidden,
             link: self.hover_link.clone(),
             indicator: palette.fg_subtle.opacity(0.5),
-            selection: palette.accent_subtle,
             preedit: self.preedit.clone(),
             view: cx.entity(),
             focus: self.focus.clone(),
@@ -1276,7 +1276,6 @@ struct PaintData {
     /// The link to underline, under the mouse with Ctrl held.
     link: Option<Link>,
     indicator: Hsla,
-    selection: Hsla,
     /// Text an input method is composing, drawn at the cursor.
     preedit: Option<String>,
     /// The view, to register it as the input handler of the window.
@@ -1301,15 +1300,6 @@ fn paint_grid(data: &PaintData, bounds: Bounds<Pixels>, window: &mut Window, cx:
     };
     let regular = font(data.family.clone());
     for (row, line) in frame.lines.iter().enumerate() {
-        if let Some((start, end)) = line.selection {
-            window.paint_quad(fill(
-                Bounds::new(
-                    cell(start, row),
-                    size(metrics.width * f32::from(end + 1 - start), metrics.height),
-                ),
-                data.selection,
-            ));
-        }
         for span in &line.backgrounds {
             window.paint_quad(fill(
                 Bounds::new(

@@ -1,6 +1,7 @@
 //! UI state and logic in plain Rust, unit tested without a window.
 
 pub mod box_drawing;
+pub mod colors;
 pub mod config;
 pub mod drop;
 pub mod images;

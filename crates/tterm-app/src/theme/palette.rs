@@ -1,35 +1,10 @@
-//! The terminal's own colors on top of telaio's palette: the pure black ground of the design
-//! (A1, "Negro puro"), the tab bar, and the ANSI colors of the shell. Read through
+//! The terminal's own colors on top of telaio's palette: the tab bar, and the scheme of the
+//! shell, the user's in the dark theme (#30, `state::colors`) and a light one. Read through
 //! [`TerminalColors`], an extension trait on `telaio_ui::Palette`, as Postino's `PostinoColors`.
 
-use gpui_kit::{Hsla, Rgba};
-use telaio_ui::Palette;
-use tterm_term::{ColorScheme, Rgb};
-
-/// The dark scheme of the design: text `#e9eaee` on `#0b0b0f`, the indigo cursor.
-pub const DARK_SCHEME: ColorScheme = ColorScheme {
-    foreground: Rgb::hex(0xe9eaee),
-    background: Rgb::hex(0x0b0b0f),
-    cursor: Rgb::hex(0x5b63e6),
-    ansi: [
-        Rgb::hex(0x23252c),
-        Rgb::hex(0xf27171),
-        Rgb::hex(0x4fc88f),
-        Rgb::hex(0xe8b75a),
-        Rgb::hex(0x7a80eb),
-        Rgb::hex(0xc58af9),
-        Rgb::hex(0x5fc8d6),
-        Rgb::hex(0xc9cbd3),
-        Rgb::hex(0x8b8e9a),
-        Rgb::hex(0xf79595),
-        Rgb::hex(0x76d8a8),
-        Rgb::hex(0xf0ca82),
-        Rgb::hex(0xa3a9ff),
-        Rgb::hex(0xd6a8fb),
-        Rgb::hex(0x8adbe5),
-        Rgb::hex(0xffffff),
-    ],
-};
+use gpui_kit::{App, Global, Hsla, Rgba};
+use telaio_ui::{Palette, PaletteExt as _};
+use tterm_term::{ColorScheme, Rgb, SelectionStyle};
 
 /// The light scheme: the same hues, darker so they read on white.
 pub const LIGHT_SCHEME: ColorScheme = ColorScheme {
@@ -54,14 +29,33 @@ pub const LIGHT_SCHEME: ColorScheme = ColorScheme {
         Rgb::hex(0x2299ab),
         Rgb::hex(0xf3f4f6),
     ],
+    selection: SelectionStyle::Color(Rgb::hex(0xd9dcff)),
 };
+
+/// The dark theme's terminal colors, from the settings (#30): kept as a global so every view
+/// reads the same scheme.
+pub struct DarkScheme(pub ColorScheme);
+
+impl Global for DarkScheme {}
+
+/// The terminal's colors for the mode of the palette: the user's dark scheme, or the light one.
+pub fn scheme(cx: &App) -> ColorScheme {
+    if cx.palette().dark {
+        cx.try_global::<DarkScheme>()
+            .map(|scheme| scheme.0)
+            .unwrap_or(crate::state::colors::KITTY)
+    } else {
+        LIGHT_SCHEME
+    }
+}
+
+/// The ground of the window and the active tab: the terminal's background.
+pub fn terminal_bg(cx: &App) -> Hsla {
+    rgb(scheme(cx).background)
+}
 
 /// The terminal's colors, for the mode of the palette.
 pub trait TerminalColors {
-    /// The color scheme every new terminal starts with.
-    fn scheme(&self) -> &'static ColorScheme;
-    /// The ground of the window and the active tab.
-    fn terminal_bg(&self) -> Hsla;
     /// The tab bar behind the inactive tabs.
     fn tab_bar_bg(&self) -> Hsla;
     /// The line under the tab bar and around the active tab.
@@ -71,18 +65,6 @@ pub trait TerminalColors {
 }
 
 impl TerminalColors for Palette {
-    fn scheme(&self) -> &'static ColorScheme {
-        if self.dark {
-            &DARK_SCHEME
-        } else {
-            &LIGHT_SCHEME
-        }
-    }
-
-    fn terminal_bg(&self) -> Hsla {
-        rgb(self.scheme().background)
-    }
-
     fn tab_bar_bg(&self) -> Hsla {
         if self.dark {
             rgb(Rgb::hex(0x111115))
@@ -124,9 +106,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_schemes_have_the_design_ground() {
-        assert_eq!(DARK_SCHEME.background, Rgb::hex(0x0b0b0f));
-        assert_eq!(DARK_SCHEME.cursor, Rgb::hex(0x5b63e6));
-        assert_ne!(LIGHT_SCHEME.background, DARK_SCHEME.background);
+    fn the_light_scheme_has_a_white_ground() {
+        assert_eq!(LIGHT_SCHEME.background, Rgb::hex(0xffffff));
+        assert_ne!(
+            LIGHT_SCHEME.background,
+            crate::state::colors::KITTY.background
+        );
     }
 }

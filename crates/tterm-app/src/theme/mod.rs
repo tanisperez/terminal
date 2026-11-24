@@ -17,13 +17,22 @@ use crate::state::settings::Settings;
 /// themes. Call once, before opening any window.
 pub fn install(cx: &mut App, settings: &Settings) {
     fonts::register(cx);
+    set_dark_scheme(cx, settings);
     telaio_ui::install(cx, &theme_family(settings));
 }
 
 /// Rebuilds the themes from `settings` and makes them the active ones, live. The caller applies
 /// the theme choice afterwards to repaint the window.
 pub fn apply_settings(cx: &mut App, settings: &Settings) {
+    set_dark_scheme(cx, settings);
     telaio_ui::apply(cx, &theme_family(settings));
+}
+
+/// The dark theme's terminal colors, from the user's `[colors]`.
+fn set_dark_scheme(cx: &mut App, settings: &Settings) {
+    cx.set_global(palette::DarkScheme(crate::state::colors::dark_scheme(
+        &settings.colors,
+    )));
 }
 
 /// The theme family: telaio's default tokens and fonts, with the terminal font as the monospace

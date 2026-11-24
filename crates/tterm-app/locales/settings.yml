@@ -120,3 +120,6 @@ _version: 2
 "settings.new_tabs_in.start_folder":
   en: "Start folder"
   es: "Inicio"
+"settings.category.colors":
+  en: "Colors"
+  es: "Colores"

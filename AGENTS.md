@@ -58,7 +58,8 @@ Expo/React Native conventions here.
   centered across and starts at the top, under the bar (A4, C).
 - Settings apply at once and are saved, as every app on telaio (shared rules, section 10), not
   with the Cancel and Save buttons of board F.
-- The default theme is Dark, the pure black of the design.
+- The default theme is Dark, the pure black of the design. Its terminal colors are the author's
+  kitty palette (#30, `state/colors.rs`), changed in Settings, Colors and saved as `[colors]`.
 - Pasted clipboard images (#3, decided on 2026-11-23) are saved as PNG in the OS cache folder
   (`~/.cache/tterm/images/`, `~/Library/Caches/tterm/images/`,
   `%LOCALAPPDATA%\tterm\cache\images\`), never in Downloads or `/tmp`, so a resumed agent

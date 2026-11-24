@@ -413,7 +413,7 @@ impl Render for UsageView {
             .key_context("UsageScreen")
             .track_focus(&self.focus)
             .size_full()
-            .bg(palette.terminal_bg())
+            .bg(crate::theme::palette::terminal_bg(cx))
             .text_color(palette.fg)
             .text_size(px(13.0))
             .on_action(

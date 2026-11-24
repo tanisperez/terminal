@@ -46,6 +46,8 @@ pub enum Category {
     /// Theme, font, cursor, pasting.
     #[default]
     General,
+    /// The terminal's colors (#30).
+    Colors,
     /// Detected and own profiles.
     Profiles,
     /// Version and links.
@@ -53,12 +55,19 @@ pub enum Category {
 }
 
 impl Category {
-    const ALL: [Category; 3] = [Category::General, Category::Profiles, Category::About];
+    const ALL: [Category; 4] = [
+        Category::General,
+        Category::Colors,
+        Category::Profiles,
+        Category::About,
+    ];
 
-    /// The page of a `TTERM_OPEN` value: `settings`, `settings-profiles`, `settings-about`.
+    /// The page of a `TTERM_OPEN` value: `settings`, `settings-colors`, `settings-profiles`,
+    /// `settings-about`.
     pub fn from_hook(value: &str) -> Option<Self> {
         match value.trim() {
             "settings" => Some(Category::General),
+            "settings-colors" => Some(Category::Colors),
             "settings-profiles" => Some(Category::Profiles),
             "settings-about" => Some(Category::About),
             _ => None,
@@ -68,6 +77,7 @@ impl Category {
     fn label(self) -> String {
         match self {
             Category::General => t!("settings.category.general"),
+            Category::Colors => t!("settings.category.colors"),
             Category::Profiles => t!("settings.category.profiles"),
             Category::About => t!("settings.category.about"),
         }
@@ -92,6 +102,7 @@ pub fn open(weak: WeakEntity<AppView>, window: &mut Window, cx: &mut App) {
             .filter(|font| installed.iter().any(|name| name == *font))
             .map(|font| font.to_string()),
     );
+    let _ = weak.update(cx, |view, cx| view.ensure_color_editor(window, cx));
     window.open_dialog(cx, move |dialog, window, _| {
         let weak = weak.clone();
         let fonts = fonts.clone();
@@ -114,6 +125,7 @@ fn render(weak: WeakEntity<AppView>, fonts: &[String], cx: &mut App) -> AnyEleme
     let categories = Category::ALL.map(|category| {
         let icon = match category {
             Category::General => IconName::SlidersHorizontal,
+            Category::Colors => IconName::Palette,
             Category::Profiles => IconName::SquareTerminal,
             Category::About => IconName::Info,
         };
@@ -131,6 +143,7 @@ fn render(weak: WeakEntity<AppView>, fonts: &[String], cx: &mut App) -> AnyEleme
             input_section(weak.clone(), &settings, &palette),
             language_section(weak.clone(), settings.language),
         ],
+        Category::Colors => vec![super::settings_colors::colors_section(weak.clone(), cx)],
         Category::Profiles => vec![super::settings_profiles::profiles_section(weak.clone(), cx)],
         Category::About => {
             let mut sections = vec![about_section(&palette, &mono_font)];

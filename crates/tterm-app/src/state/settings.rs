@@ -4,6 +4,7 @@
 //! Only what 0.1.0 needs: language, theme, the terminal font and its size, the cursor shape,
 //! pasting images, the log level and the update check. Each feature adds its own settings as it lands.
 
+use std::collections::BTreeMap;
 use std::fs;
 use std::ops::RangeInclusive;
 use std::path::{Path, PathBuf};
@@ -183,6 +184,9 @@ pub struct Settings {
     /// The order of the profiles in the menus and their number shortcuts (#32), by name.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub profile_order: Vec<String>,
+    /// The terminal colors changed by the user, `[colors]` (see `state::colors`).
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub colors: BTreeMap<String, String>,
     /// The user's own profiles. Last: TOML writes tables after the plain values.
     pub profiles: Vec<ProfileConfig>,
 }
@@ -219,6 +223,7 @@ impl Default for Settings {
             default_profile: None,
             hidden_profiles: Vec::new(),
             profile_order: Vec::new(),
+            colors: BTreeMap::new(),
             profiles: Vec::new(),
         }
     }
@@ -347,6 +352,18 @@ fn parse_settings(content: &str) -> Settings {
             .filter_map(toml::Value::as_str)
             .map(String::from)
             .collect();
+    }
+    if let Some(colors) = table.get("colors").and_then(toml::Value::as_table) {
+        for (name, value) in colors {
+            match (super::colors::ColorKey::parse(name), value.as_str()) {
+                (Some(key), Some(value)) if super::colors::is_valid(key, value) => {
+                    settings
+                        .colors
+                        .insert(name.clone(), value.trim().to_string());
+                }
+                _ => log::warn!("ignoring the color {name}: unknown or not #rrggbb"),
+            }
+        }
     }
     if let Some(list) = table.get("profiles").and_then(toml::Value::as_array) {
         for profile in list.iter().filter_map(toml::Value::as_table) {
@@ -478,6 +495,10 @@ mod tests {
             default_profile: Some("claude · telaio".to_string()),
             hidden_profiles: vec!["fish".to_string()],
             profile_order: vec!["ssh · servidor".to_string(), "zsh".to_string()],
+            colors: BTreeMap::from([
+                ("color4".to_string(), "#3355ff".to_string()),
+                ("selection".to_string(), "#264f78".to_string()),
+            ]),
             profiles: vec![
                 ProfileConfig {
                     name: "claude · telaio".to_string(),

@@ -4,6 +4,7 @@ mod profile_menu;
 mod profile_picker;
 mod root;
 mod settings;
+mod settings_colors;
 mod settings_profiles;
 mod terminal;
 mod update;
