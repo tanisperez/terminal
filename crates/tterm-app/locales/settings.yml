@@ -93,3 +93,30 @@ _version: 2
 "settings.profile.default_description":
   en: "The one the new tab shortcut opens. They are edited in Profiles."
   es: "El que abre el atajo de nueva pestaña. Se editan en Perfiles."
+"settings.tabs":
+  en: "Tabs"
+  es: "Pestañas"
+"settings.start_folder.label":
+  en: "Start folder"
+  es: "Carpeta de inicio"
+"settings.start_folder.description":
+  en: "Where the first tab of each window opens."
+  es: "Donde abre la primera pestaña de cada ventana."
+"settings.start_folder.choose":
+  en: "Choose…"
+  es: "Elegir…"
+"settings.start_folder.reset":
+  en: "Use the home folder"
+  es: "Usar la carpeta personal"
+"settings.new_tabs_in.label":
+  en: "New tabs open in"
+  es: "Las pestañas nuevas se abren en"
+"settings.new_tabs_in.description":
+  en: "The active tab's folder or the start folder. A profile's own folder wins over both."
+  es: "En la carpeta de la pestaña activa o en la de inicio. La de un perfil manda sobre las dos."
+"settings.new_tabs_in.active_tab":
+  en: "Active tab"
+  es: "Pestaña activa"
+"settings.new_tabs_in.start_folder":
+  en: "Start folder"
+  es: "Inicio"

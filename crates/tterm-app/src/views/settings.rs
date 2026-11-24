@@ -3,6 +3,7 @@
 //! on telaio. Profiles and Shortcuts join with their features.
 
 use gpui_kit::assets::IconName;
+use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenu};
 use gpui_kit::component::switch::Switch;
 use gpui_kit::component::*;
@@ -17,7 +18,8 @@ use telaio_ui::components::{
 
 use crate::state::locale::{LANGUAGES, LanguageChoice};
 use crate::state::settings::{
-    CursorChoice, FONT_SIZE_RANGE, FONT_SIZE_STEP, Settings, ThemeChoice, path_label, settings_path,
+    CursorChoice, FONT_SIZE_RANGE, FONT_SIZE_STEP, NewTabsIn, Settings, ThemeChoice, path_label,
+    settings_path,
 };
 use crate::theme::metrics::CONTROL_HEIGHT;
 use crate::theme::{Palette, PaletteExt as _};
@@ -124,6 +126,7 @@ fn render(weak: WeakEntity<AppView>, fonts: &[String], cx: &mut App) -> AnyEleme
     let sections = match category {
         Category::General => vec![
             appearance_section(weak.clone(), &settings, fonts, &palette, cx),
+            tabs_section(weak.clone(), &settings, &palette, &mono_font),
             profile_section(weak.clone(), view, &palette, cx),
             input_section(weak.clone(), &settings, &palette),
             language_section(weak.clone(), settings.language),
@@ -337,6 +340,121 @@ fn profile_section(
                 .description(t!("settings.profile.default_description")),
         )
         .into_any_element()
+}
+
+/// "Tabs" (#28, design F2): the start folder of a window's first tab and where new tabs open.
+fn tabs_section(
+    weak: WeakEntity<AppView>,
+    settings: &Settings,
+    palette: &Palette,
+    mono_font: &SharedString,
+) -> AnyElement {
+    let folder = settings
+        .start_folder
+        .clone()
+        .unwrap_or_else(|| "~".to_string());
+    let choose_weak = weak.clone();
+    let reset_weak = weak.clone();
+    let start = h_flex()
+        .gap(px(8.0))
+        .h(px(CONTROL_HEIGHT))
+        .child(
+            div()
+                .w(px(FONT_SELECT_WIDTH))
+                .h(px(CONTROL_HEIGHT))
+                .px(px(10.0))
+                .flex()
+                .items_center()
+                .rounded(px(7.0))
+                .border_1()
+                .border_color(palette.border_strong)
+                .bg(palette.raised)
+                .font_family(mono_font.clone())
+                .text_size(px(12.5))
+                .text_color(palette.fg)
+                .child(div().min_w_0().truncate().child(folder)),
+        )
+        .child(
+            SecondaryButton::new(
+                "settings-start-folder-choose",
+                t!("settings.start_folder.choose"),
+            )
+            .icon(IconName::FolderOpen)
+            .on_click(move |_, window, cx| {
+                let _ = choose_weak.update(cx, |view, cx| view.choose_start_folder(window, cx));
+            }),
+        )
+        .when(settings.start_folder.is_some(), |row| {
+            row.child(
+                Button::new("settings-start-folder-reset")
+                    .ghost()
+                    .small()
+                    .icon(IconName::X)
+                    .tooltip(t!("settings.start_folder.reset"))
+                    .on_click(move |_, window, cx| {
+                        update(&reset_weak, window, cx, |settings| {
+                            settings.start_folder = None
+                        })
+                    }),
+            )
+        });
+    let mut new_tabs = SegmentedControl::new("settings-new-tabs-in");
+    for choice in NewTabsIn::ALL {
+        let weak = weak.clone();
+        let label = match choice {
+            NewTabsIn::ActiveTab => t!("settings.new_tabs_in.active_tab"),
+            NewTabsIn::StartFolder => t!("settings.new_tabs_in.start_folder"),
+        };
+        new_tabs = new_tabs.item(
+            SegmentedItem::new(label)
+                .selected(choice == settings.new_tabs_in)
+                .on_click(move |window, cx| {
+                    update(&weak, window, cx, |settings| settings.new_tabs_in = choice)
+                }),
+        );
+    }
+    v_flex()
+        .gap(px(14.0))
+        .child(SectionHeading::new(t!("settings.tabs")))
+        .child(
+            LabeledRow::new(t!("settings.start_folder.label"), start)
+                .description(t!("settings.start_folder.description")),
+        )
+        .child(
+            LabeledRow::new(t!("settings.new_tabs_in.label"), new_tabs)
+                .description(t!("settings.new_tabs_in.description")),
+        )
+        .into_any_element()
+}
+
+impl AppView {
+    /// Asks for the start folder with the system's folder dialog (#28) and saves it, under `~`
+    /// when it is in the home folder.
+    fn choose_start_folder(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let paths = cx.prompt_for_paths(PathPromptOptions {
+            files: false,
+            directories: true,
+            multiple: false,
+            prompt: Some(t!("settings.start_folder.choose").into_owned().into()),
+        });
+        cx.spawn_in(window, async move |view, cx| {
+            let Ok(Ok(Some(paths))) = paths.await else {
+                return;
+            };
+            let Some(path) = paths.into_iter().next() else {
+                return;
+            };
+            let home = std::env::home_dir();
+            let folder = crate::state::tabs::home_path(&path, home.as_deref());
+            view.update_in(cx, |view, window, cx| {
+                let mut settings = view.settings.clone();
+                settings.start_folder = Some(folder);
+                view.apply_settings(settings, window, cx);
+            })
+            .ok();
+        })
+        .detach();
+    }
 }
 
 fn input_section(weak: WeakEntity<AppView>, settings: &Settings, palette: &Palette) -> AnyElement {

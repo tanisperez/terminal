@@ -109,6 +109,43 @@ impl From<CursorChoice> for tterm_term::CursorStyleChoice {
     }
 }
 
+/// Where a new tab opens (#28, design F2). A profile's own folder wins over both.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum NewTabsIn {
+    /// The folder of the active tab, or the start folder without one.
+    #[default]
+    ActiveTab,
+    /// The start folder.
+    StartFolder,
+}
+
+impl NewTabsIn {
+    /// Every choice, in the order of the segmented control.
+    pub const ALL: [NewTabsIn; 2] = [NewTabsIn::ActiveTab, NewTabsIn::StartFolder];
+
+    fn parse(text: &str) -> Option<Self> {
+        match text.trim().to_ascii_lowercase().as_str() {
+            "active_tab" => Some(NewTabsIn::ActiveTab),
+            "start_folder" => Some(NewTabsIn::StartFolder),
+            _ => None,
+        }
+    }
+}
+
+/// The folder a new tab opens in, before its profile's own (#28): the active tab's (`active`)
+/// or the start folder (`start`), as `mode` says. `None` is the home folder.
+pub fn new_tab_folder(
+    mode: NewTabsIn,
+    active: Option<PathBuf>,
+    start: Option<PathBuf>,
+) -> Option<PathBuf> {
+    match mode {
+        NewTabsIn::ActiveTab => active.or(start),
+        NewTabsIn::StartFolder => start,
+    }
+}
+
 /// Everything in `settings.toml`.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Settings {
@@ -133,6 +170,11 @@ pub struct Settings {
     /// Whether the in-app updater checks once after startup. Only builds with the updater
     /// (`state/update.rs`) read it.
     pub check_updates: bool,
+    /// The folder of a window's first tab (`~/dev`); the home folder when absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub start_folder: Option<String>,
+    /// Where a new tab opens.
+    pub new_tabs_in: NewTabsIn,
     /// The name of the profile a new tab opens; the first one when absent or unknown.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default_profile: Option<String>,
@@ -143,6 +185,20 @@ pub struct Settings {
     pub profile_order: Vec<String>,
     /// The user's own profiles. Last: TOML writes tables after the plain values.
     pub profiles: Vec<ProfileConfig>,
+}
+
+impl Settings {
+    /// The start folder, expanded; `None` (the home folder) when unset or not a folder.
+    pub fn start_folder_path(&self, home: Option<&Path>) -> Option<PathBuf> {
+        let folder = self.start_folder.as_deref()?;
+        let path = super::profiles::expand_home(folder, home);
+        if path.is_dir() {
+            Some(path)
+        } else {
+            log::warn!("the start folder is not a folder, using the home folder");
+            None
+        }
+    }
 }
 
 impl Default for Settings {
@@ -158,6 +214,8 @@ impl Default for Settings {
             pasted_images_days: 14,
             log_level: LogLevel::default(),
             check_updates: true,
+            start_folder: None,
+            new_tabs_in: NewTabsIn::default(),
             default_profile: None,
             hidden_profiles: Vec::new(),
             profile_order: Vec::new(),
@@ -267,6 +325,12 @@ fn parse_settings(content: &str) -> Settings {
     {
         settings.pasted_images_days = value.clamp(1, 365) as u32;
     }
+    if let Some(value) = text("start_folder").filter(|folder| !folder.trim().is_empty()) {
+        settings.start_folder = Some(value.trim().to_string());
+    }
+    if let Some(value) = text("new_tabs_in").and_then(NewTabsIn::parse) {
+        settings.new_tabs_in = value;
+    }
     if let Some(value) = text("default_profile").filter(|name| !name.trim().is_empty()) {
         settings.default_profile = Some(value.trim().to_string());
     }
@@ -368,6 +432,34 @@ mod tests {
     }
 
     #[test]
+    fn new_tabs_open_in_the_active_tab_folder_or_the_start_folder() {
+        let active = Some(PathBuf::from("/home/me/dev/terminal"));
+        let start = Some(PathBuf::from("/home/me/dev"));
+        assert_eq!(
+            new_tab_folder(NewTabsIn::ActiveTab, active.clone(), start.clone()),
+            active
+        );
+        // The first tab of a window has no active tab.
+        assert_eq!(
+            new_tab_folder(NewTabsIn::ActiveTab, None, start.clone()),
+            start
+        );
+        assert_eq!(
+            new_tab_folder(NewTabsIn::StartFolder, active, start.clone()),
+            start
+        );
+        assert_eq!(new_tab_folder(NewTabsIn::StartFolder, None, None), None);
+        assert_eq!(
+            parse_settings("new_tabs_in = \"start_folder\"").new_tabs_in,
+            NewTabsIn::StartFolder
+        );
+        assert_eq!(
+            parse_settings("new_tabs_in = \"nope\"").new_tabs_in,
+            NewTabsIn::ActiveTab
+        );
+    }
+
+    #[test]
     fn saved_settings_read_back_the_same() {
         let dir = tempfile::tempdir().unwrap();
         let settings = Settings {
@@ -381,6 +473,8 @@ mod tests {
             pasted_images_days: 30,
             log_level: LogLevel::Debug,
             check_updates: false,
+            start_folder: Some("~/dev".to_string()),
+            new_tabs_in: NewTabsIn::StartFolder,
             default_profile: Some("claude · telaio".to_string()),
             hidden_profiles: vec!["fish".to_string()],
             profile_order: vec!["ssh · servidor".to_string(), "zsh".to_string()],

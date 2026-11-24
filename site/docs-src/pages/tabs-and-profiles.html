@@ -8,7 +8,8 @@ description: How tabs work in Tanis Terminal, which shells it finds, and how to 
 <p>A tab is named after the title the running program sets, or else after its shell and folder (<code>zsh · terminal</code>). A tab opened from a profile of yours keeps the profile's name.</p>
 <ul>
     <li>Hover a tab to see its whole title, its folder and its profile, when the name is cut short.</li>
-    <li>A new tab starts in the folder of the active one. The shell reports it through its <a href="#shell-integration">integration</a>; on Linux, Tanis Terminal also reads it from the running program.</li>
+    <li>The first tab of a window starts in the start folder, your home folder unless Settings, General, <strong>Start folder</strong> says otherwise.</li>
+    <li>A new tab starts in the folder of the active one, or in the start folder when <strong>New tabs open in</strong> says so. The shell reports its folder through its <a href="#shell-integration">integration</a>; on Linux, Tanis Terminal also reads it from the running program. A profile with its own folder always starts there.</li>
     <li>Drag a tab onto another to put it in that place, or past the last tab to move it to the end. An accent line marks where it lands.</li>
     <li>Right click a tab for <strong>Close</strong>, <strong>Close others</strong>, <strong>Close to the right</strong>, <strong>Close to the left</strong> and <strong>Close all</strong>.</li>
     <li>When the only tab closes, the window closes. A single tab has no close button for that reason.</li>

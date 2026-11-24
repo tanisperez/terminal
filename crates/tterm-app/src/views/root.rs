@@ -229,9 +229,15 @@ impl AppView {
         }
     }
 
-    /// The folder a new tab starts in: the one the active shell reported, or the home folder.
+    /// The folder a new tab starts in (#28): the active shell's or the start folder, as the
+    /// settings say; the home folder when `None`. The first tab has no active one.
     fn new_tab_folder(&self, cx: &App) -> Option<PathBuf> {
-        self.tabs.active().and_then(|tab| tab.read(cx).cwd())
+        let home = std::env::home_dir();
+        crate::state::settings::new_tab_folder(
+            self.settings.new_tabs_in,
+            self.tabs.active().and_then(|tab| tab.read(cx).cwd()),
+            self.settings.start_folder_path(home.as_deref()),
+        )
     }
 
     fn new_tab(&mut self, _: &NewTab, window: &mut Window, cx: &mut Context<Self>) {
