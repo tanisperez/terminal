@@ -17,7 +17,7 @@ use telaio_ui::components::{
 
 use crate::state::locale::{LANGUAGES, LanguageChoice};
 use crate::state::settings::{
-    CursorChoice, FONT_SIZE_RANGE, FONT_SIZE_STEP, Settings, ThemeChoice, settings_path,
+    CursorChoice, FONT_SIZE_RANGE, FONT_SIZE_STEP, Settings, ThemeChoice, path_label, settings_path,
 };
 use crate::theme::metrics::CONTROL_HEIGHT;
 use crate::theme::{Palette, PaletteExt as _};
@@ -142,7 +142,7 @@ fn render(weak: WeakEntity<AppView>, fonts: &[String], cx: &mut App) -> AnyEleme
         }
     };
     let path = settings_path()
-        .map(|path| path.display().to_string())
+        .map(|path| path_label(&path, std::env::home_dir().as_deref()))
         .unwrap_or_default();
     let select = weak.clone();
     SettingsLayout::new("settings")

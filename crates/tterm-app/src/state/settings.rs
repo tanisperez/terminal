@@ -189,6 +189,18 @@ pub fn settings_path() -> Option<PathBuf> {
     config_dir().map(|base| base.join(SETTINGS_FILE))
 }
 
+/// A path as Settings shows it: under `~` when it is in the home folder, with a zero width
+/// space after every separator so a narrow column wraps it between folders. Windows' `\` is
+/// not a line break opportunity, so without it the path broke in the middle of a name.
+pub fn path_label(path: &Path, home: Option<&Path>) -> String {
+    let text = match home.and_then(|home| path.strip_prefix(home).ok()) {
+        Some(rest) if rest.as_os_str().is_empty() => "~".to_string(),
+        Some(rest) => format!("~{}{}", std::path::MAIN_SEPARATOR, rest.display()),
+        None => path.display().to_string(),
+    };
+    text.replace('\\', "\\\u{200B}").replace('/', "/\u{200B}")
+}
+
 fn write_settings(base: &Path, settings: &Settings) {
     if let Err(error) = fs::create_dir_all(base) {
         log::warn!("could not create {}: {error}", base.display());
@@ -292,6 +304,26 @@ fn as_f32(value: &toml::Value) -> Option<f32> {
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
+    #[test]
+    fn a_path_is_shown_under_home_and_wraps_between_folders() {
+        let home = Path::new("/home/ana");
+        assert_eq!(
+            path_label(
+                Path::new("/home/ana/.config/tterm/settings.toml"),
+                Some(home)
+            ),
+            format!(
+                "~{sep}\u{200B}.config/\u{200B}tterm/\u{200B}settings.toml",
+                sep = std::path::MAIN_SEPARATOR
+            )
+        );
+        assert_eq!(
+            path_label(Path::new("/etc/tterm.toml"), Some(home)),
+            "/\u{200B}etc/\u{200B}tterm.toml"
+        );
+        assert_eq!(path_label(home, Some(home)), "~");
+    }
+
     use super::*;
     use pretty_assertions::assert_eq;
 
