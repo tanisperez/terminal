@@ -237,6 +237,17 @@ impl Default for Settings {
     }
 }
 
+/// The font and size of a tab (#39): its profile's own, when the tab runs one of the user's
+/// profiles that has them, or General's.
+pub fn tab_font(settings: &Settings, profile: Option<&str>) -> (String, f32) {
+    let own = profile.and_then(|name| settings.profiles.iter().find(|p| p.name == name));
+    (
+        own.and_then(|p| p.font.clone())
+            .unwrap_or_else(|| settings.font.clone()),
+        own.and_then(|p| p.font_size).unwrap_or(settings.font_size),
+    )
+}
+
 /// `size` inside [`FONT_SIZE_RANGE`].
 pub fn clamp_font_size(size: f32) -> f32 {
     size.clamp(*FONT_SIZE_RANGE.start(), *FONT_SIZE_RANGE.end())
@@ -461,6 +472,22 @@ mod tests {
         assert_eq!(parse_settings("font_size = 100").font_size, 32.0);
         assert_eq!(parse_settings("font_size = 2.5").font_size, 8.0);
         assert_eq!(parse_settings("font_size = 14.5").font_size, 14.5);
+    }
+
+    #[test]
+    fn a_profile_may_have_its_own_font_and_size() {
+        let settings = parse_settings(
+            "font = \"Fira Code\"\nfont_size = 13\n\n[[profiles]]\nname = \"big\"\nfont = \"Noto Sans Mono\"\nfont_size = 18.0\n\n[[profiles]]\nname = \"plain\"\n",
+        );
+        assert_eq!(
+            tab_font(&settings, Some("big")),
+            ("Noto Sans Mono".to_string(), 18.0)
+        );
+        assert_eq!(
+            tab_font(&settings, Some("plain")),
+            ("Fira Code".to_string(), 13.0)
+        );
+        assert_eq!(tab_font(&settings, None), ("Fira Code".to_string(), 13.0));
     }
 
     #[test]

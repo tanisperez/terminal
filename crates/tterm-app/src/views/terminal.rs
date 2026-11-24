@@ -193,13 +193,17 @@ impl TerminalView {
             rows: size.rows,
         };
         let (sender, receiver) = async_channel::bounded::<Vec<u8>>(CHANNEL_CHUNKS);
+        let own_profile = profile
+            .filter(|profile| profile.origin != Origin::Detected)
+            .map(|profile| profile.name.as_str());
+        let tab_font = crate::state::settings::tab_font(settings, own_profile);
         let mut this = Self {
             emulator,
             pty: None,
             focus: cx.focus_handle(),
             frame: Frame::default(),
-            font_family: settings.font.clone().into(),
-            font_size: settings.font_size,
+            font_family: tab_font.0.into(),
+            font_size: tab_font.1,
             metrics: None,
             shell: match profile {
                 Some(profile) if !profile.command.is_empty() => profile.name.clone(),
@@ -350,8 +354,10 @@ impl TerminalView {
 
     /// Applies changed settings: the font, its size, the cursor and the colors.
     pub fn apply_settings(&mut self, settings: &Settings, cx: &mut Context<Self>) {
-        self.font_family = settings.font.clone().into();
-        self.font_size = settings.font_size;
+        let (family, size) =
+            crate::state::settings::tab_font(settings, self.profile_name.as_deref());
+        self.font_family = family.into();
+        self.font_size = size;
         self.paste_images = settings.paste_images;
         self.cursor_blink = settings.cursor_blink;
         self.restart_blink(cx);

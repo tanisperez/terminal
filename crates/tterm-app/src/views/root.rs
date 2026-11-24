@@ -160,9 +160,13 @@ impl AppView {
         let settings = self.settings.clone();
         let font_size = self.font_size;
         let cwd = cwd.or_else(|| self.new_tab_folder(cx));
+        // A zoomed window opens its tabs at the zoom; otherwise a tab keeps its profile's size.
+        let zoomed = font_size != settings.font_size;
         let terminal = cx.new(|cx| {
             let mut view = TerminalView::new(profile, cwd, &settings, window, cx);
-            view.set_font_size(font_size, cx);
+            if zoomed {
+                view.set_font_size(font_size, cx);
+            }
             view
         });
         let subscription = cx.subscribe_in(&terminal, window, Self::on_terminal_event);
@@ -295,7 +299,12 @@ impl AppView {
     }
 
     fn zoom_reset(&mut self, _: &ZoomReset, _: &mut Window, cx: &mut Context<Self>) {
-        self.set_font_size(self.settings.font_size, cx);
+        // Back to each tab's own size: its profile's, or General's (#39).
+        self.font_size = self.settings.font_size;
+        let settings = self.settings.clone();
+        for tab in self.tabs.iter() {
+            tab.update(cx, |tab, cx| tab.apply_settings(&settings, cx));
+        }
     }
 
     fn open_picker(&mut self, _: &OpenProfilePicker, window: &mut Window, cx: &mut Context<Self>) {
@@ -375,10 +384,7 @@ impl AppView {
         self.settings = settings.clone();
         self.rebuild_profiles();
         for tab in self.tabs.iter() {
-            tab.update(cx, |tab, cx| {
-                tab.apply_settings(&settings, cx);
-                tab.set_font_size(settings.font_size, cx);
-            });
+            tab.update(cx, |tab, cx| tab.apply_settings(&settings, cx));
         }
         log::info!("settings saved");
         cx.notify();

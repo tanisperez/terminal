@@ -84,3 +84,9 @@ _version: 2
 "profiles.delete":
   en: "Delete profile"
   es: "Eliminar perfil"
+"profiles.font":
+  en: "Font"
+  es: "Fuente"
+"profiles.font_general":
+  en: "General's"
+  es: "La de General"

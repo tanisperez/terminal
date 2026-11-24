@@ -69,7 +69,7 @@ impl ProfileColor {
 }
 
 /// A profile of the user, as written in `settings.toml`.
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize)]
 pub struct ProfileConfig {
     /// The name in the menus and the tab, unique.
     pub name: String,
@@ -88,6 +88,12 @@ pub struct ProfileConfig {
     /// The number of its shortcut, 1 to [`MAX_SHORTCUT`].
     #[serde(skip_serializing_if = "Option::is_none")]
     pub shortcut: Option<u8>,
+    /// Its own terminal font (#39); General's when absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub font: Option<String>,
+    /// Its own font size in points (#39); General's when absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub font_size: Option<f32>,
 }
 
 impl ProfileConfig {
@@ -115,6 +121,11 @@ impl ProfileConfig {
                 .and_then(toml::Value::as_integer)
                 .filter(|number| (1..=i64::from(MAX_SHORTCUT)).contains(number))
                 .map(|number| number as u8),
+            font: text("font"),
+            font_size: table
+                .get("font_size")
+                .and_then(|value| value.as_float().or(value.as_integer().map(|n| n as f64)))
+                .map(|size| super::settings::clamp_font_size(size as f32)),
         })
     }
 }

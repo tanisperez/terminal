@@ -10,7 +10,12 @@ use gpui_kit::component::*;
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 use rust_i18n::t;
-use telaio_ui::components::{LabeledRow, SegmentedControl, SegmentedItem, switch_halo, text_field};
+use telaio_ui::components::{
+    LabeledRow, NumberStepper, SearchableSelect, SegmentedControl, SegmentedItem, SelectHandle,
+    SelectOption, on_pick, select_state, switch_halo, text_field,
+};
+
+use crate::state::settings::{FONT_SIZE_RANGE, FONT_SIZE_STEP};
 
 use crate::state::profiles::{MAX_SHORTCUT, Origin, ProfileColor, ProfileConfig, moved, ordered};
 use crate::theme::{Palette, PaletteExt as _};
@@ -20,6 +25,8 @@ use super::root::AppView;
 
 /// Width of the list of profiles.
 const LIST_WIDTH: f32 = 268.0;
+/// Width of the font select of a profile.
+const FONT_SELECT_WIDTH: f32 = 188.0;
 /// Height of a row of the list.
 const ROW_HEIGHT: f32 = 32.0;
 
@@ -39,6 +46,8 @@ pub struct ProfileEditor {
     shell: Entity<InputState>,
     cwd: Entity<InputState>,
     startup: Entity<InputState>,
+    /// The profile's own font, or General's (#39, design T2).
+    font: SelectHandle,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -111,12 +120,45 @@ impl AppView {
             Field::Cwd,
         );
         let startup = field(config.startup.as_deref(), String::new(), Field::Startup);
+        // The profile's font: General's (an empty value) or any font of the searchable list.
+        let installed = cx.text_system().all_font_names();
+        let current = config
+            .font
+            .clone()
+            .unwrap_or_else(|| self.settings.font.clone());
+        let options = std::iter::once(SelectOption::new(
+            String::new(),
+            t!("profiles.font_general").into_owned(),
+        ))
+        .chain(
+            crate::theme::fonts::select_fonts(&installed, &current)
+                .into_iter()
+                .map(|name| SelectOption::new(name.clone(), name)),
+        )
+        .collect();
+        let font = select_state(
+            options,
+            Some(config.font.as_deref().unwrap_or_default()),
+            true,
+            window,
+            cx,
+        );
+        subscriptions.push(on_pick(
+            &font,
+            window,
+            cx,
+            move |view, value, window, cx| {
+                let value = (!value.is_empty()).then(|| value.to_string());
+                view.change_profile(index, window, cx, |profile| profile.font = value);
+            },
+        ));
         ProfileEditor {
             index,
             name,
             shell,
             cwd,
             startup,
+            font,
             _subscriptions: subscriptions,
         }
     }
@@ -414,11 +456,19 @@ pub fn profiles_section(weak: WeakEntity<AppView>, cx: &App) -> AnyElement {
     );
 
     let form = match (&selection, view.profile_editor.as_ref()) {
-        (Some(ProfileSelection::Own(index)), Some(editor)) if editor.index == *index => view
-            .settings
-            .profiles
-            .get(*index)
-            .map(|config| own_form(weak.clone(), editor, config, &default_name, &palette, cx)),
+        (Some(ProfileSelection::Own(index)), Some(editor)) if editor.index == *index => {
+            view.settings.profiles.get(*index).map(|config| {
+                own_form(
+                    weak.clone(),
+                    editor,
+                    config,
+                    &view.settings,
+                    &default_name,
+                    &palette,
+                    cx,
+                )
+            })
+        }
         (Some(ProfileSelection::Detected(name)), _) => view
             .detected
             .iter()
@@ -589,6 +639,7 @@ fn own_form(
     weak: WeakEntity<AppView>,
     editor: &ProfileEditor,
     config: &ProfileConfig,
+    general: &crate::state::settings::Settings,
     default_name: &Option<String>,
     palette: &Palette,
     cx: &App,
@@ -641,6 +692,23 @@ fn own_form(
                 }),
         );
     }
+    let size_weak = weak.clone();
+    let (_, size) = crate::state::settings::tab_font(general, Some(&config.name));
+    let font_row = h_flex()
+        .gap(px(8.0))
+        .child(SearchableSelect::new("profile-font", &editor.font).width(FONT_SELECT_WIDTH))
+        .child(
+            NumberStepper::new("profile-font-size", size)
+                .step(FONT_SIZE_STEP)
+                .range(*FONT_SIZE_RANGE.start(), *FONT_SIZE_RANGE.end())
+                .on_change(move |size, window, cx| {
+                    let _ = size_weak.update(cx, |view, cx| {
+                        view.change_profile(index, window, cx, |profile| {
+                            profile.font_size = Some(size)
+                        })
+                    });
+                }),
+        );
     let delete = weak.clone();
     v_flex()
         .gap(px(14.0))
@@ -672,6 +740,7 @@ fn own_form(
                     .child(t!("profiles.startup_description")),
             ),
         )
+        .child(labeled_field(t!("profiles.font"), font_row, palette))
         .child(LabeledRow::new(t!("profiles.color"), colors))
         .child(labeled_field(t!("profiles.shortcut"), shortcuts, palette))
         .child(default_switch(
