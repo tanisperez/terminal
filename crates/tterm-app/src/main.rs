@@ -202,12 +202,21 @@ fn remember_window_size(
         })
         .detach();
     });
-    cx.on_window_closed(move |_, _| state::window::save(&last.get()))
-        .detach();
+    // Every window hears every window close (#34): only its own close saves its size, so the
+    // last window closed decides the size of the next start.
+    let id = window.window_handle().window_id();
+    cx.on_window_closed(move |_, closed| {
+        if closed == id {
+            state::window::save(&last.get());
+        }
+    })
+    .detach();
 }
 
 /// The size that opens the window as it is now (see ted's `main.rs`: the shadow of the client
-/// side decorations counts differently on Wayland and X11).
+/// side decorations counts differently on Wayland and X11). A compositor that draws the
+/// decorations itself, as the headless sway of the UI tests, makes gpui report a size that grows
+/// on every run; the desktops tterm runs on (KDE, GNOME, Windows, macOS) do not.
 fn reopening_size(wayland: bool, window: &Window) -> Size<Pixels> {
     if wayland {
         window.bounds().size
