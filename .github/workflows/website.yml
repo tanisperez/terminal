@@ -59,5 +59,10 @@ jobs:
         with:
           path: _site
 
+      # deploy-pages looks the artifact up right away and GitHub may not list it yet: deploys
+      # failed with "No artifacts named github-pages" a tenth of a second after the upload.
+      - name: Wait for the artifact to be listed
+        run: sleep 15
+
       - id: deployment
         uses: actions/deploy-pages@v5
