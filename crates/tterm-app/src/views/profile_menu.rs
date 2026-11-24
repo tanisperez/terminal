@@ -93,7 +93,7 @@ pub fn chevron(
                     .on_click(move |_, window, cx| {
                         let _ = settings.update(cx, |view, cx| {
                             view.settings_category = Category::Profiles;
-                            view.ensure_color_editor(window, cx);
+                            view.prepare_settings(window, cx);
                             super::settings::open(cx.weak_entity(), window, cx);
                         });
                     }),

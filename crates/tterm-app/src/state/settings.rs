@@ -35,7 +35,7 @@ pub const OPACITY_RANGE: RangeInclusive<f32> = 0.5..=1.0;
 pub const OPACITY_STEP: f32 = 0.05;
 
 /// The default terminal font, bundled with the app (design T).
-pub const DEFAULT_FONT: &str = "Noto Sans Mono";
+pub const DEFAULT_FONT: &str = "CaskaydiaCove Nerd Font Mono";
 
 /// Which theme mode the app follows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize)]

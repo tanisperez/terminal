@@ -11,9 +11,10 @@ use gpui_kit::prelude::*;
 use gpui_kit::*;
 use rust_i18n::t;
 use telaio_ui::components::{
-    LabeledRow, NumberStepper, OpenOnClickExt as _, SecondaryButton, SectionHeading,
-    SegmentedControl, SegmentedItem, SettingsCategory, SettingsLayout, menu_choice_item,
-    select_label_row, select_trigger, settings_dialog, switch_halo,
+    LabeledRow, NumberStepper, OpenOnClickExt as _, SearchableSelect, SecondaryButton,
+    SectionHeading, SegmentedControl, SegmentedItem, SelectHandle, SelectOption, SettingsCategory,
+    SettingsLayout, menu_choice_item, on_pick, select_label_row, select_state, select_trigger,
+    settings_dialog, switch_halo,
 };
 
 use crate::state::locale::{LANGUAGES, LanguageChoice};
@@ -28,17 +29,6 @@ use super::root::AppView;
 
 /// Width of the font select.
 const FONT_SELECT_WIDTH: f32 = 188.0;
-
-/// Monospace fonts offered when they are installed, after the bundled ones.
-const KNOWN_FONTS: [&str; 7] = [
-    "Source Code Pro",
-    "Ubuntu Mono",
-    "DejaVu Sans Mono",
-    "Hack",
-    "Menlo",
-    "SF Mono",
-    "Consolas",
-];
 
 /// The categories, in the order of the navigation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -85,35 +75,20 @@ impl Category {
     }
 }
 
-/// Opens the Settings dialog, unless one is already open. The caller creates the Colors page's
-/// picker first ([`AppView::ensure_color_editor`]): `AppView` may be the entity being updated.
+/// Opens the Settings dialog, unless one is already open. The caller prepares it first
+/// ([`AppView::prepare_settings`]): `AppView` may be the entity being updated.
 pub fn open(weak: WeakEntity<AppView>, window: &mut Window, cx: &mut App) {
     if window.has_active_dialog(cx) {
         return;
     }
-    // The fonts installed are read once per opening, not on every frame.
-    let installed = cx.text_system().all_font_names();
-    let mut fonts: Vec<String> = crate::theme::fonts::BUNDLED
-        .iter()
-        .map(|font| font.to_string())
-        .collect();
-    fonts.extend(
-        KNOWN_FONTS
-            .iter()
-            .filter(|font| installed.iter().any(|name| name == *font))
-            .map(|font| font.to_string()),
-    );
     window.open_dialog(cx, move |dialog, window, _| {
         let weak = weak.clone();
-        let fonts = fonts.clone();
-        settings_dialog(dialog, window, move |_, cx| {
-            render(weak.clone(), &fonts, cx)
-        })
+        settings_dialog(dialog, window, move |_, cx| render(weak.clone(), cx))
     });
 }
 
 /// The whole dialog, rebuilt on every frame from the view's current settings.
-fn render(weak: WeakEntity<AppView>, fonts: &[String], cx: &mut App) -> AnyElement {
+fn render(weak: WeakEntity<AppView>, cx: &mut App) -> AnyElement {
     let Some(view) = weak.upgrade() else {
         return div().into_any_element();
     };
@@ -137,7 +112,7 @@ fn render(weak: WeakEntity<AppView>, fonts: &[String], cx: &mut App) -> AnyEleme
         .unwrap_or(0);
     let sections = match category {
         Category::General => vec![
-            appearance_section(weak.clone(), &settings, fonts, &palette, cx),
+            appearance_section(weak.clone(), view, &settings, &palette),
             tabs_section(weak.clone(), &settings, &palette, &mono_font),
             profile_section(weak.clone(), view, &palette, cx),
             input_section(weak.clone(), &settings, &palette),
@@ -200,10 +175,9 @@ fn update(
 
 fn appearance_section(
     weak: WeakEntity<AppView>,
+    view: &AppView,
     settings: &Settings,
-    fonts: &[String],
     palette: &Palette,
-    cx: &App,
 ) -> AnyElement {
     let mut theme = SegmentedControl::new("settings-theme");
     for choice in ThemeChoice::ALL {
@@ -221,36 +195,14 @@ fn appearance_section(
                 }),
         );
     }
-    let current_font = settings.font.clone();
-    let menu_fonts = fonts.to_vec();
-    let menu_weak = weak.clone();
-    let font_select = select_trigger("settings-font", palette, cx)
-        .w(px(FONT_SELECT_WIDTH))
-        .text_color(palette.fg)
-        .child(select_label_row(
-            div()
-                .font_family(current_font.clone())
-                .child(current_font.clone()),
-            palette,
-        ))
-        .open_on_click()
-        .dropdown_menu(move |menu: PopupMenu, _, _| {
-            let mut menu = menu;
-            for font in &menu_fonts {
-                let weak = menu_weak.clone();
-                let picked = font.clone();
-                menu = menu.item(menu_choice_item(
-                    font.clone(),
-                    None,
-                    *font == current_font,
-                    move |window, cx| {
-                        let picked = picked.clone();
-                        update(&weak, window, cx, |settings| settings.font = picked)
-                    },
-                ));
-            }
-            menu
-        });
+    // The searchable list of the bundled and installed fonts (T2), created when the dialog opens.
+    let font_select = match view.font_select.as_ref() {
+        Some((select, _)) => SearchableSelect::new("settings-font", select)
+            .width(FONT_SELECT_WIDTH)
+            .mono(settings.font.clone())
+            .into_any_element(),
+        None => div().into_any_element(),
+    };
     let size_weak = weak.clone();
     let font_size = NumberStepper::new("settings-font-size", settings.font_size)
         .step(FONT_SIZE_STEP)
@@ -455,6 +407,25 @@ fn tabs_section(
 }
 
 impl AppView {
+    /// Creates what the dialog keeps between frames, before it opens: the font list (read from
+    /// the system once per opening) and the color picker of the Colors page.
+    pub(crate) fn prepare_settings(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.ensure_color_editor(window, cx);
+        let installed = cx.text_system().all_font_names();
+        let options = crate::theme::fonts::select_fonts(&installed, &self.settings.font)
+            .into_iter()
+            .map(|name| SelectOption::new(name.clone(), name))
+            .collect();
+        let select: SelectHandle =
+            select_state(options, Some(&self.settings.font), true, window, cx);
+        let subscription = on_pick(&select, window, cx, |view, font, window, cx| {
+            let mut settings = view.settings.clone();
+            settings.font = font.to_string();
+            view.apply_settings(settings, window, cx);
+        });
+        self.font_select = Some((select, subscription));
+    }
+
     /// Asks for the start folder with the system's folder dialog (#28) and saves it, under `~`
     /// when it is in the home folder.
     fn choose_start_folder(&mut self, window: &mut Window, cx: &mut Context<Self>) {

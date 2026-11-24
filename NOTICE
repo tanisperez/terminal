@@ -6,6 +6,9 @@ This product is licensed under the Apache License, Version 2.0 (see LICENSE).
 It links libghostty-vt, the terminal emulation library of Ghostty (https://ghostty.org),
 through the ghostty-vt crate. Ghostty is licensed under the MIT License.
 
-It bundles the fonts Noto Sans Mono (The Noto Project Authors), Cascadia Code (Microsoft),
-JetBrains Mono (JetBrains) and Fira Code (The Fira Code Project Authors), licensed under the SIL Open Font
-License 1.1 (see crates/tterm-app/assets/fonts).
+It bundles the fonts CaskaydiaCove Nerd Font Mono (Cascadia Code by Microsoft, patched by
+Nerd Fonts), JetBrains Mono (JetBrains), Fira Code (The Fira Code Project Authors) and Noto Sans
+Mono (The Noto Project Authors), licensed under the SIL Open Font License 1.1, and Symbols Nerd
+Font Mono (Ryan L McIntyre, Nerd Fonts), licensed under the MIT License, whose icons come from
+sets under their own licenses (https://github.com/ryanoasis/nerd-fonts). See
+crates/tterm-app/assets/fonts.

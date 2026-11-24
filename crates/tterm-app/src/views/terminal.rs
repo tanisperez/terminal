@@ -1003,7 +1003,9 @@ impl TerminalView {
         }
         let font_size = px(self.font_size * PIXELS_PER_POINT);
         let text_system = window.text_system();
-        let font_id = text_system.resolve_font(&font(self.font_family.clone()));
+        let font_id = text_system.resolve_font(&crate::theme::fonts::terminal_font(
+            self.font_family.clone(),
+        ));
         let width = text_system
             .advance(font_id, font_size, 'm')
             .map(|size| size.width)
@@ -1298,7 +1300,7 @@ fn paint_grid(data: &PaintData, bounds: Bounds<Pixels>, window: &mut Window, cx:
             origin.y + metrics.height * row as f32,
         )
     };
-    let regular = font(data.family.clone());
+    let regular = crate::theme::fonts::terminal_font(data.family.clone());
     for (row, line) in frame.lines.iter().enumerate() {
         for span in &line.backgrounds {
             window.paint_quad(fill(

@@ -46,6 +46,8 @@ pub struct AppView {
     pub(crate) profile_editor: Option<super::settings_profiles::ProfileEditor>,
     /// The color being edited on the Colors page of Settings.
     pub(crate) color_editor: Option<super::settings_colors::ColorEditor>,
+    /// The font list of Settings, rebuilt each time the dialog opens.
+    pub(crate) font_select: Option<(telaio_ui::components::SelectHandle, Subscription)>,
     /// The profiles of the menus, from `detected` and the settings.
     pub(crate) profiles: Profiles,
     /// The font size of this session: Settings' size, changed by the zoom shortcuts.
@@ -82,6 +84,7 @@ impl AppView {
             profile_selection: None,
             profile_editor: None,
             color_editor: None,
+            font_select: None,
             profiles: Profiles::default(),
             font_size,
             settings_category: super::settings::Category::default(),
@@ -118,7 +121,7 @@ impl AppView {
             view.settings_category = category;
             let weak = cx.weak_entity();
             window.defer(cx, move |window, cx| {
-                let _ = weak.update(cx, |view, cx| view.ensure_color_editor(window, cx));
+                let _ = weak.update(cx, |view, cx| view.prepare_settings(window, cx));
                 super::settings::open(weak, window, cx)
             });
         }
@@ -347,7 +350,7 @@ impl AppView {
     }
 
     fn open_settings(&mut self, _: &OpenSettings, window: &mut Window, cx: &mut Context<Self>) {
-        self.ensure_color_editor(window, cx);
+        self.prepare_settings(window, cx);
         super::settings::open(cx.weak_entity(), window, cx);
     }
 

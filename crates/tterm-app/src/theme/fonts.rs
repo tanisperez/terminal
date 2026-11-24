@@ -1,36 +1,69 @@
-//! The terminal fonts bundled with the app (design T), all under the SIL Open Font License 1.1
-//! (`assets/fonts/*-OFL.txt`): Noto Sans Mono (the default), Cascadia Code, JetBrains Mono and
-//! Fira Code, next to the Geist Mono telaio bundles. They work the same on every system, with or without them
+//! The terminal fonts bundled with the app (designs T and T2): CaskaydiaCove Nerd Font Mono (the
+//! default, Cascadia Code with the Nerd Font icons), JetBrains Mono, Fira Code and Noto Sans Mono,
+//! next to the Geist Mono telaio bundles, all under the SIL Open Font License 1.1
+//! (`assets/fonts/*-OFL.txt`). Symbols Nerd Font Mono (MIT, `SymbolsNerdFont-MIT.txt`) is the
+//! fallback of every terminal font, bundled or installed, so prompts and tools that draw icons
+//! show them with any font (#35). They work the same on every system, with or without them
 //! installed.
 
 use std::borrow::Cow;
 
-use gpui_kit::App;
+use gpui_kit::{App, Font, FontFallbacks, SharedString, font};
 
 /// The bundled terminal fonts, in the order of the font select. Geist Mono comes from telaio.
 pub const BUNDLED: [&str; 5] = [
-    "Noto Sans Mono",
-    "Cascadia Code",
+    "CaskaydiaCove Nerd Font Mono",
     "JetBrains Mono",
     "Fira Code",
+    "Noto Sans Mono",
     "Geist Mono",
 ];
 
+/// The icons of every terminal font: the Nerd Font symbols alone.
+pub const SYMBOLS: &str = "Symbols Nerd Font Mono";
+
 /// Every font file this app adds (telaio registers Geist Mono).
-pub const FILES: [&[u8]; 12] = [
-    include_bytes!("../../assets/fonts/NotoSansMono-Regular.ttf"),
-    include_bytes!("../../assets/fonts/NotoSansMono-Bold.ttf"),
-    include_bytes!("../../assets/fonts/CascadiaCode-Regular.ttf"),
-    include_bytes!("../../assets/fonts/CascadiaCode-Bold.ttf"),
-    include_bytes!("../../assets/fonts/CascadiaCode-Italic.ttf"),
-    include_bytes!("../../assets/fonts/CascadiaCode-BoldItalic.ttf"),
+pub const FILES: [&[u8]; 13] = [
+    include_bytes!("../../assets/fonts/CaskaydiaCoveNerdFontMono-Regular.ttf"),
+    include_bytes!("../../assets/fonts/CaskaydiaCoveNerdFontMono-Bold.ttf"),
+    include_bytes!("../../assets/fonts/CaskaydiaCoveNerdFontMono-Italic.ttf"),
+    include_bytes!("../../assets/fonts/CaskaydiaCoveNerdFontMono-BoldItalic.ttf"),
     include_bytes!("../../assets/fonts/JetBrainsMono-Regular.ttf"),
     include_bytes!("../../assets/fonts/JetBrainsMono-Bold.ttf"),
     include_bytes!("../../assets/fonts/JetBrainsMono-Italic.ttf"),
     include_bytes!("../../assets/fonts/JetBrainsMono-BoldItalic.ttf"),
     include_bytes!("../../assets/fonts/FiraCode-Regular.ttf"),
     include_bytes!("../../assets/fonts/FiraCode-Bold.ttf"),
+    include_bytes!("../../assets/fonts/NotoSansMono-Regular.ttf"),
+    include_bytes!("../../assets/fonts/NotoSansMono-Bold.ttf"),
+    include_bytes!("../../assets/fonts/SymbolsNerdFontMono-Regular.ttf"),
 ];
+
+/// A terminal font: `family`, with the Nerd Font symbols for the icons it lacks.
+pub fn terminal_font(family: SharedString) -> Font {
+    Font {
+        fallbacks: Some(FontFallbacks::from_fonts(vec![SYMBOLS.to_string()])),
+        ..font(family)
+    }
+}
+
+/// The fonts of the font select: the bundled ones first, then every other family installed, in
+/// alphabetical order, plus `current` when it is neither (a name written in the file).
+pub fn select_fonts(installed: &[String], current: &str) -> Vec<String> {
+    let mut fonts: Vec<String> = BUNDLED.iter().map(|font| font.to_string()).collect();
+    let mut others: Vec<String> = installed
+        .iter()
+        .filter(|name| !name.starts_with('.') && *name != SYMBOLS && !fonts.contains(name))
+        .cloned()
+        .collect();
+    others.sort_by_key(|name| name.to_lowercase());
+    others.dedup();
+    fonts.extend(others);
+    if !fonts.iter().any(|font| font == current) {
+        fonts.push(current.to_string());
+    }
+    fonts
+}
 
 /// Adds the bundled fonts to the text system. A font the platform rejects is not worth
 /// aborting over: the terminal falls back to another monospace font.
@@ -43,7 +76,21 @@ pub fn register(cx: &App) {
 
 #[cfg(test)]
 mod tests {
-    use super::FILES;
+    use super::*;
+
+    #[test]
+    fn the_select_lists_bundled_fonts_first_then_the_installed_ones() {
+        let installed = [
+            "Ubuntu Mono".to_string(),
+            "Fira Code".to_string(),
+            ".SystemUIFont".to_string(),
+            "DejaVu Sans Mono".to_string(),
+            SYMBOLS.to_string(),
+        ];
+        let fonts = select_fonts(&installed, "Hack");
+        assert_eq!(fonts[..5], BUNDLED.map(String::from));
+        assert_eq!(fonts[5..], ["DejaVu Sans Mono", "Ubuntu Mono", "Hack"]);
+    }
 
     #[test]
     fn every_bundled_font_is_a_truetype_file() {

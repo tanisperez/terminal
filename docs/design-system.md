@@ -96,8 +96,8 @@ The 16 ANSI colors of the dark theme are kitty's: `#000000 #cc0403 #19cb00 #cecb
 ## Typography
 
 - Interface: Geist 13 from telaio.
-- Terminal: the `font` setting, Noto Sans Mono 12 pt by default, as board T (what kitty shows
-  on the author's machine). Noto Sans Mono, Cascadia Code, JetBrains Mono and Fira Code are
-  bundled (`theme/fonts.rs`, OFL 1.1), Geist Mono comes from
-  telaio; the select lists them first, then the known monospace fonts installed. Ligatures are
-  on.
+- Terminal: the `font` setting, CaskaydiaCove Nerd Font Mono 12 pt by default (#35, board T2).
+  CaskaydiaCove Nerd Font Mono, JetBrains Mono, Fira Code and Noto Sans Mono are bundled
+  (`theme/fonts.rs`, OFL 1.1), Geist Mono comes from telaio; the searchable select lists them
+  first, then every font installed. Symbols Nerd Font Mono (MIT) is bundled as the fallback of
+  every terminal font, so the Nerd Font icons show with any of them. Ligatures are on.
