@@ -16,6 +16,16 @@ description: How tabs work in Tanis Terminal, which shells it finds, and how to 
     <li>When the only tab closes, the window closes. A single tab has no close button for that reason.</li>
 </ul>
 
+<h2 id="panes">Panes</h2>
+<p>A tab splits into panes, side by side or stacked, each one with its own shell. Right click a terminal for <strong>Split Right</strong>, <strong>Split Down</strong>, <strong>Duplicate Pane</strong> and <strong>Close Pane</strong>, or use the <a href="keyboard-shortcuts.html#panes">pane shortcuts</a>.</p>
+<ul>
+    <li>A new pane runs the same profile as the one it splits, in its folder.</li>
+    <li>The pane with the focus is at full color; the others are dimmed. Click one to give it the focus. The tab is named after it.</li>
+    <li>Drag the line between two panes to resize them.</li>
+    <li><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>W</kbd> closes the pane with the focus; with the last one, the tab. A pane whose shell exits closes too.</li>
+    <li>Moving a tab to a new window takes all its panes.</li>
+</ul>
+
 <h2>Detected shells</h2>
 <p>When Tanis Terminal starts, it lists the shells of your machine as profiles:</p>
 <ul>

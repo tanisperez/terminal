@@ -17,7 +17,8 @@ actions!(
     [
         /// Opens a tab with the default profile (`Ctrl+Shift+T`, `Cmd+T`).
         NewTab,
-        /// Closes the active tab (`Ctrl+Shift+W`, `Cmd+W`).
+        /// Closes the pane with the focus, and the tab with its last pane (`Ctrl+Shift+W`,
+        /// `Cmd+W`).
         CloseTab,
         /// Shows the next tab, wrapping around (`Ctrl+Tab`).
         NextTab,

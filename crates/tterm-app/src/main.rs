@@ -36,8 +36,8 @@ const WINDOW_SIZES: window::WindowSizes = window::WindowSizes {
 pub enum FirstTabs {
     /// A tab per folder of the command line, or the default profile's without any.
     Folders(Vec<std::path::PathBuf>),
-    /// A tab moved from another window, still running (#34).
-    Moved(Entity<views::TerminalView>),
+    /// A tab moved from another window, still running, with its panes (#34).
+    Moved(views::Tab),
 }
 
 /// Opens a window of tterm with `first` in it, at `bounds` (the platform's place and the default

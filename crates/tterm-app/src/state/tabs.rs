@@ -40,6 +40,11 @@ impl<T> Tabs<T> {
         self.tabs.get(self.active)
     }
 
+    /// The tab at `index`, to change it (its panes, #33).
+    pub fn get_mut(&mut self, index: usize) -> Option<&mut T> {
+        self.tabs.get_mut(index)
+    }
+
     /// Every tab, in order.
     pub fn iter(&self) -> impl Iterator<Item = &T> {
         self.tabs.iter()
@@ -222,6 +227,16 @@ mod tests {
 
     fn names(tabs: &Tabs<&'static str>) -> Vec<&'static str> {
         tabs.iter().copied().collect()
+    }
+
+    #[test]
+    fn a_tab_can_be_changed_in_place() {
+        let mut tabs = tabs(&["a", "b"]);
+        if let Some(tab) = tabs.get_mut(0) {
+            *tab = "z";
+        }
+        assert_eq!(names(&tabs), vec!["z", "b"]);
+        assert!(tabs.get_mut(5).is_none());
     }
 
     #[test]

@@ -7,6 +7,7 @@ pub mod drop;
 pub mod images;
 pub mod links;
 pub mod locale;
+pub mod panes;
 pub mod profiles;
 pub mod settings;
 pub mod shell;

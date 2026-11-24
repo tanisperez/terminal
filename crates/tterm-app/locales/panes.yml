@@ -1,0 +1,14 @@
+# Split panes (#33, design S1).
+_version: 2
+"panes.split_right":
+  en: "Split Right   Alt+Shift++"
+  es: "Dividir a la derecha   Alt+Shift++"
+"panes.split_down":
+  en: "Split Down   Alt+Shift+-"
+  es: "Dividir abajo   Alt+Shift+-"
+"panes.duplicate":
+  en: "Duplicate Pane   Alt+Shift+D"
+  es: "Duplicar panel   Alt+Shift+D"
+"panes.close":
+  en: "Close Pane   Ctrl+Shift+W"
+  es: "Cerrar panel   Ctrl+Shift+W"

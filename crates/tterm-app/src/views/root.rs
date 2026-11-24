@@ -33,11 +33,12 @@ use crate::theme::{Palette, PaletteExt as _, TerminalColors as _};
 use super::profile_picker::{PickerEvent, ProfilePicker};
 use super::terminal::{TabHover, TerminalEvent, TerminalView};
 use super::usage::{UsageEvent, UsageView};
+use crate::state::panes::{self, Axis, Direction, PaneSplit, PaneTree};
 
 /// The root view of the window.
 pub struct AppView {
     pub(crate) settings: Settings,
-    tabs: Tabs<Entity<TerminalView>>,
+    tabs: Tabs<Tab>,
     /// The profiles found on this machine.
     pub(crate) detected: Vec<Profile>,
     /// The profile the Profiles page of Settings shows.
@@ -69,6 +70,46 @@ pub struct AppView {
     /// The subscription to each tab's events, dropped when the tab closes or moves away.
     terminal_subscriptions: Vec<(EntityId, Subscription)>,
 }
+
+/// A tab: its panes and the one with the focus, which names the tab (#33, design S1).
+#[derive(Clone)]
+pub struct Tab {
+    panes: PaneTree<Entity<TerminalView>>,
+    focused: Entity<TerminalView>,
+}
+
+impl Tab {
+    fn new(terminal: Entity<TerminalView>) -> Self {
+        Self {
+            panes: PaneTree::Leaf(terminal.clone()),
+            focused: terminal,
+        }
+    }
+
+    /// Every terminal of the tab, one per pane.
+    pub fn terminals(&self) -> Vec<Entity<TerminalView>> {
+        self.panes.leaves()
+    }
+}
+
+/// The value carried while a separator between panes is dragged: which split it belongs to, by
+/// its path from the root of the active tab's tree.
+#[derive(Clone)]
+struct DraggedSeparator {
+    path: Vec<bool>,
+    axis: Axis,
+}
+
+impl Render for DraggedSeparator {
+    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+        div()
+    }
+}
+
+/// The width of the line between two panes.
+const SEPARATOR_WIDTH: f32 = 1.0;
+/// The width of the area around it that takes the mouse.
+const SEPARATOR_GRAB: f32 = 6.0;
 
 impl AppView {
     /// The window with one tab per folder of `dirs`, or one in the home folder.
@@ -105,13 +146,13 @@ impl AppView {
         match first {
             crate::FirstTabs::Folders(dirs) => view.start_first_window(dirs, window, cx),
             // A tab moved from another window (#34).
-            crate::FirstTabs::Moved(terminal) => view.adopt_tab(terminal, window, cx),
+            crate::FirstTabs::Moved(tab) => view.adopt_tab(tab, window, cx),
         }
         // Settings may follow the system theme: the terminal colors follow the mode.
         view._subscriptions
             .push(cx.observe_window_appearance(window, |view, _, cx| {
-                for tab in view.tabs.iter() {
-                    tab.update(cx, |tab, cx| tab.apply_colors(cx));
+                for terminal in view.terminals() {
+                    terminal.update(cx, |terminal, cx| terminal.apply_colors(cx));
                 }
             }));
         view
@@ -157,6 +198,291 @@ impl AppView {
         }
     }
 
+    /// The index of the tab that holds `terminal`.
+    fn tab_of(&self, terminal: &Entity<TerminalView>) -> Option<usize> {
+        self.tabs.position(|tab| tab.panes.contains(terminal))
+    }
+
+    /// Tells the terminals of the tab at `index` whether it has several panes.
+    fn refresh_split(&self, index: usize, cx: &mut Context<Self>) {
+        let Some(tab) = self.tabs.iter().nth(index) else {
+            return;
+        };
+        let split = tab.panes.len() > 1;
+        for terminal in tab.terminals() {
+            terminal.update(cx, |terminal, _| terminal.set_split(split));
+        }
+    }
+
+    /// Closes the pane of `terminal`, and its tab when it is the last pane (#33).
+    fn close_pane(
+        &mut self,
+        terminal: &Entity<TerminalView>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(index) = self.tab_of(terminal) else {
+            return;
+        };
+        let Some(tab) = self.tabs.get_mut(index) else {
+            return;
+        };
+        if tab.panes.len() == 1 {
+            self.close_tab_at(index, window, cx);
+            return;
+        }
+        // The focus goes to a neighbor, as in Windows Terminal.
+        let next = [
+            Direction::Left,
+            Direction::Up,
+            Direction::Right,
+            Direction::Down,
+        ]
+        .into_iter()
+        .find_map(|direction| tab.panes.neighbor(terminal, direction));
+        tab.panes.remove(terminal);
+        if &tab.focused == terminal
+            && let Some(next) = next.or_else(|| tab.panes.leaves().into_iter().next())
+        {
+            tab.focused = next;
+        }
+        let id = terminal.entity_id();
+        self.terminal_subscriptions
+            .retain(|(other, _)| *other != id);
+        self.refresh_split(index, cx);
+        if index == self.tabs.active_index() {
+            self.focus_active(window, cx);
+        }
+        cx.notify();
+    }
+
+    /// Splits the pane of `terminal` (#33): a new terminal in its folder, with its profile, takes
+    /// the right or bottom half and the focus.
+    fn split_pane(
+        &mut self,
+        terminal: &Entity<TerminalView>,
+        split: PaneSplit,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(index) = self.tab_of(terminal) else {
+            return;
+        };
+        let (profile, cwd, area) = {
+            let view = terminal.read(cx);
+            (view.profile().cloned(), view.cwd(), view.area())
+        };
+        let axis = match split {
+            PaneSplit::Right => Axis::Horizontal,
+            PaneSplit::Down => Axis::Vertical,
+            PaneSplit::Duplicate => {
+                panes::roomiest_axis(f32::from(area.width), f32::from(area.height))
+            }
+        };
+        let settings = self.settings.clone();
+        let font_size = self.font_size;
+        let zoomed = font_size != settings.font_size;
+        let new = cx.new(|cx| {
+            let mut view = TerminalView::new(profile.as_ref(), cwd, &settings, window, cx);
+            if zoomed {
+                view.set_font_size(font_size, cx);
+            }
+            view
+        });
+        self.watch_terminal(&new, window, cx);
+        if let Some(tab) = self.tabs.get_mut(index) {
+            tab.panes.split(terminal, axis, new.clone());
+            tab.focused = new;
+        }
+        self.refresh_split(index, cx);
+        self.focus_active(window, cx);
+        cx.notify();
+    }
+
+    /// Moves the focus from the pane of `terminal` to its neighbor in `direction`.
+    fn focus_pane(
+        &mut self,
+        terminal: &Entity<TerminalView>,
+        direction: Direction,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(index) = self.tab_of(terminal) else {
+            return;
+        };
+        let Some(tab) = self.tabs.get_mut(index) else {
+            return;
+        };
+        if let Some(next) = tab.panes.neighbor(terminal, direction) {
+            tab.focused = next;
+            self.focus_active(window, cx);
+            cx.notify();
+        }
+    }
+
+    /// Moves the separator nearest to the pane of `terminal` toward `direction`.
+    fn resize_pane(
+        &mut self,
+        terminal: &Entity<TerminalView>,
+        direction: Direction,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(index) = self.tab_of(terminal) else {
+            return;
+        };
+        if let Some(tab) = self.tabs.get_mut(index)
+            && tab.panes.resize(terminal, direction, panes::RESIZE_STEP)
+        {
+            cx.notify();
+        }
+    }
+
+    /// The panes of `tab`: the terminals laid out as their tree says, the ones without the focus
+    /// dimmed, with separators that resize them when dragged (S1).
+    fn render_panes(&self, tab: &Tab, cx: &mut Context<Self>) -> AnyElement {
+        let multiple = tab.panes.len() > 1;
+        self.render_pane_tree(&tab.panes, Vec::new(), &tab.focused, multiple, cx)
+    }
+
+    fn render_pane_tree(
+        &self,
+        tree: &PaneTree<Entity<TerminalView>>,
+        path: Vec<bool>,
+        focused: &Entity<TerminalView>,
+        multiple: bool,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        match tree {
+            PaneTree::Leaf(terminal) => {
+                let dim = multiple && terminal != focused;
+                let veil = crate::theme::palette::scheme(cx).background;
+                div()
+                    .relative()
+                    .size_full()
+                    .overflow_hidden()
+                    .child(terminal.clone())
+                    .when(dim, |pane| {
+                        pane.child(
+                            div()
+                                .absolute()
+                                .inset_0()
+                                .bg(crate::theme::palette::rgb(veil).opacity(0.45)),
+                        )
+                    })
+                    .into_any_element()
+            }
+            PaneTree::Split {
+                axis,
+                ratio,
+                first,
+                second,
+            } => {
+                let axis = *axis;
+                let mut first_path = path.clone();
+                first_path.push(false);
+                let mut second_path = path.clone();
+                second_path.push(true);
+                let first = self.render_pane_tree(first, first_path, focused, multiple, cx);
+                let second = self.render_pane_tree(second, second_path, focused, multiple, cx);
+                let palette = cx.palette();
+                let line = palette.border;
+                let accent = palette.accent;
+                let dragged = DraggedSeparator {
+                    path: path.clone(),
+                    axis,
+                };
+                let separator = div().flex_none().bg(line).map(|separator| match axis {
+                    Axis::Horizontal => separator.w(px(SEPARATOR_WIDTH)).h_full(),
+                    Axis::Vertical => separator.h(px(SEPARATOR_WIDTH)).w_full(),
+                });
+                // The handle that takes the mouse: wider than the line and drawn over both
+                // halves, so the terminals do not take its clicks.
+                let handle = div()
+                    .id(SharedString::from(format!("separator-{path:?}")))
+                    .absolute()
+                    .occlude()
+                    .hover(move |style| style.bg(accent.opacity(0.6)))
+                    .map(|handle| match axis {
+                        Axis::Horizontal => handle
+                            .top_0()
+                            .bottom_0()
+                            .left(relative(*ratio))
+                            .ml(px(-SEPARATOR_GRAB / 2.0))
+                            .w(px(SEPARATOR_GRAB))
+                            .cursor_col_resize(),
+                        Axis::Vertical => handle
+                            .left_0()
+                            .right_0()
+                            .top(relative(*ratio))
+                            .mt(px(-SEPARATOR_GRAB / 2.0))
+                            .h(px(SEPARATOR_GRAB))
+                            .cursor_row_resize(),
+                    })
+                    .on_drag(dragged, |dragged, _, _, cx| cx.new(|_| dragged.clone()));
+                let ratio = *ratio;
+                let split_path = path;
+                // Not `h_flex`, which centers its children: both halves fill the split.
+                let container = match axis {
+                    Axis::Horizontal => div().flex().flex_row(),
+                    Axis::Vertical => div().flex().flex_col(),
+                };
+                container
+                    .id(SharedString::from(format!("split-{split_path:?}")))
+                    .relative()
+                    .size_full()
+                    .on_drag_move(cx.listener(
+                        move |view, event: &DragMoveEvent<DraggedSeparator>, _, cx| {
+                            let dragged = event.drag(cx);
+                            if dragged.path != split_path {
+                                return;
+                            }
+                            let bounds = event.bounds;
+                            let value = match dragged.axis {
+                                Axis::Horizontal => {
+                                    f32::from(event.event.position.x - bounds.origin.x)
+                                        / f32::from(bounds.size.width)
+                                }
+                                Axis::Vertical => {
+                                    f32::from(event.event.position.y - bounds.origin.y)
+                                        / f32::from(bounds.size.height)
+                                }
+                            };
+                            let index = view.tabs.active_index();
+                            if let Some(tab) = view.tabs.get_mut(index) {
+                                tab.panes.set_ratio(&dragged.path, value);
+                                cx.notify();
+                            }
+                        },
+                    ))
+                    .child(
+                        div()
+                            .flex_none()
+                            .overflow_hidden()
+                            .map(|half| match axis {
+                                Axis::Horizontal => half.h_full().w(relative(ratio)),
+                                Axis::Vertical => half.w_full().h(relative(ratio)),
+                            })
+                            .child(first),
+                    )
+                    .child(separator)
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w_0()
+                            .min_h_0()
+                            .overflow_hidden()
+                            .map(|half| match axis {
+                                Axis::Horizontal => half.h_full(),
+                                Axis::Vertical => half.w_full(),
+                            })
+                            .child(second),
+                    )
+                    .child(handle)
+                    .into_any_element()
+            }
+        }
+    }
+
     /// Rebuilds the profiles of the menus from the detected ones and the settings.
     fn rebuild_profiles(&mut self) {
         let home = std::env::home_dir();
@@ -191,24 +517,43 @@ impl AppView {
             }
             view
         });
-        self.adopt_tab(terminal, window, cx);
+        self.adopt_tab(Tab::new(terminal), window, cx);
     }
 
-    /// Shows `terminal` as a new tab of this window, from `open_tab` or moved from another
-    /// window (#34), and focuses it.
-    fn adopt_tab(
+    /// Shows `tab` as a new tab of this window, from `open_tab` or moved from another window
+    /// (#34), and focuses it.
+    fn adopt_tab(&mut self, tab: Tab, window: &mut Window, cx: &mut Context<Self>) {
+        for terminal in tab.terminals() {
+            self.watch_terminal(&terminal, window, cx);
+        }
+        self.tabs.open(tab);
+        self.focus_active(window, cx);
+        cx.notify();
+    }
+
+    /// Follows the events of `terminal`, now in this window, and its focus here.
+    fn watch_terminal(
         &mut self,
-        terminal: Entity<TerminalView>,
+        terminal: &Entity<TerminalView>,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let subscription = cx.subscribe_in(&terminal, window, Self::on_terminal_event);
+        let subscription = cx.subscribe_in(terminal, window, Self::on_terminal_event);
         self.terminal_subscriptions
             .push((terminal.entity_id(), subscription));
         terminal.update(cx, |terminal, cx| terminal.attach(window, cx));
-        self.tabs.open(terminal);
-        self.focus_active(window, cx);
-        cx.notify();
+    }
+
+    /// Stops following the terminals of a tab that closed or moved away.
+    fn unwatch_tab(&mut self, tab: &Tab) {
+        let ids: Vec<EntityId> = tab.terminals().iter().map(Entity::entity_id).collect();
+        self.terminal_subscriptions
+            .retain(|(id, _)| !ids.contains(id));
+    }
+
+    /// Every terminal of the window, in every tab and pane.
+    fn terminals(&self) -> Vec<Entity<TerminalView>> {
+        self.tabs.iter().flat_map(Tab::terminals).collect()
     }
 
     /// Moves the tab at `index` to a new window, still running (#34, design X1): the shell, the
@@ -224,24 +569,17 @@ impl AppView {
         if self.tabs.iter().count() < 2 {
             return;
         }
-        let Some(terminal) = self.tabs.close(index) else {
+        let Some(tab) = self.tabs.close(index) else {
             return;
         };
-        let id = terminal.entity_id();
-        self.terminal_subscriptions.retain(|(tab, _)| *tab != id);
+        self.unwatch_tab(&tab);
         let size = window.bounds().size;
         let bounds = at.map(|origin| WindowBounds::Windowed(Bounds::new(origin, size)));
         let settings = self.settings.clone();
         log::info!("moving a tab to a new window");
         // The new window opens once this update ends: it builds a view of its own.
         cx.defer(move |cx| {
-            crate::open_window(
-                cx,
-                settings,
-                crate::FirstTabs::Moved(terminal),
-                bounds,
-                None,
-            );
+            crate::open_window(cx, settings, crate::FirstTabs::Moved(tab), bounds, None);
         });
         self.focus_active(window, cx);
         cx.notify();
@@ -259,19 +597,29 @@ impl AppView {
             TerminalEvent::OpenProfile(number) => {
                 self.open_profile(&OpenProfile(*number), window, cx)
             }
-            TerminalEvent::Exited => {
-                if let Some(index) = self.tabs.position(|tab| tab == terminal) {
-                    self.close_tab_at(index, window, cx);
+            TerminalEvent::Exited | TerminalEvent::ClosePane => {
+                self.close_pane(terminal, window, cx)
+            }
+            TerminalEvent::Focused => {
+                if let Some(index) = self.tab_of(terminal)
+                    && let Some(tab) = self.tabs.get_mut(index)
+                {
+                    tab.focused = terminal.clone();
+                    cx.notify();
                 }
             }
+            TerminalEvent::Split(split) => self.split_pane(terminal, *split, window, cx),
+            TerminalEvent::FocusPane(direction) => {
+                self.focus_pane(terminal, *direction, window, cx)
+            }
+            TerminalEvent::ResizePane(direction) => self.resize_pane(terminal, *direction, cx),
         }
     }
 
     fn close_tab_at(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
-        // Dropping the view drops its pty, which ends the shell.
-        if let Some(terminal) = self.tabs.close(index) {
-            let id = terminal.entity_id();
-            self.terminal_subscriptions.retain(|(tab, _)| *tab != id);
+        // Dropping the views drops their ptys, which ends the shells.
+        if let Some(tab) = self.tabs.close(index) {
+            self.unwatch_tab(&tab);
         }
         if self.tabs.is_empty() {
             window.remove_window();
@@ -309,7 +657,7 @@ impl AppView {
 
     fn focus_active(&self, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(tab) = self.tabs.active() {
-            let handle = tab.read(cx).focus_handle().clone();
+            let handle = tab.focused.read(cx).focus_handle().clone();
             handle.focus(window, cx);
         }
     }
@@ -320,7 +668,9 @@ impl AppView {
         let home = std::env::home_dir();
         crate::state::settings::new_tab_folder(
             self.settings.new_tabs_in,
-            self.tabs.active().and_then(|tab| tab.read(cx).cwd()),
+            self.tabs
+                .active()
+                .and_then(|tab| tab.focused.read(cx).cwd()),
             self.settings.start_folder_path(home.as_deref()),
         )
     }
@@ -339,9 +689,12 @@ impl AppView {
         self.open_tab(Some(&profile), cwd, window, cx);
     }
 
+    /// Ctrl+Shift+W: closes the pane with the focus, and the tab with its last pane (#33).
     fn close_tab(&mut self, _: &CloseTab, window: &mut Window, cx: &mut Context<Self>) {
-        let index = self.tabs.active_index();
-        self.close_tab_at(index, window, cx);
+        let Some(focused) = self.tabs.active().map(|tab| tab.focused.clone()) else {
+            return;
+        };
+        self.close_pane(&focused, window, cx);
     }
 
     fn next_tab(&mut self, _: &NextTab, window: &mut Window, cx: &mut Context<Self>) {
@@ -359,8 +712,8 @@ impl AppView {
     fn set_font_size(&mut self, size: f32, cx: &mut Context<Self>) {
         self.font_size = clamp_font_size(size);
         let size = self.font_size;
-        for tab in self.tabs.iter() {
-            tab.update(cx, |tab, cx| tab.set_font_size(size, cx));
+        for terminal in self.terminals() {
+            terminal.update(cx, |terminal, cx| terminal.set_font_size(size, cx));
         }
     }
 
@@ -376,8 +729,8 @@ impl AppView {
         // Back to each tab's own size: its profile's, or General's (#39).
         self.font_size = self.settings.font_size;
         let settings = self.settings.clone();
-        for tab in self.tabs.iter() {
-            tab.update(cx, |tab, cx| tab.apply_settings(&settings, cx));
+        for terminal in self.terminals() {
+            terminal.update(cx, |terminal, cx| terminal.apply_settings(&settings, cx));
         }
     }
 
@@ -412,9 +765,9 @@ impl AppView {
             return;
         }
         let tabs = self
-            .tabs
+            .terminals()
             .iter()
-            .filter_map(|tab| tab.read(cx).agent())
+            .filter_map(|terminal| terminal.read(cx).agent())
             .collect();
         let usage = cx.new(|cx| UsageView::new(tabs, cx));
         let subscription =
@@ -457,8 +810,8 @@ impl AppView {
         self.font_size = settings.font_size;
         self.settings = settings.clone();
         self.rebuild_profiles();
-        for tab in self.tabs.iter() {
-            tab.update(cx, |tab, cx| tab.apply_settings(&settings, cx));
+        for terminal in self.terminals() {
+            terminal.update(cx, |terminal, cx| terminal.apply_settings(&settings, cx));
         }
         log::info!("settings saved");
         cx.notify();
@@ -495,8 +848,8 @@ impl AppView {
             }));
         for (index, tab) in self.tabs.iter().enumerate() {
             let active = index == self.tabs.active_index();
-            let label = tab.read(cx).label();
-            let hover = tab.read(cx).hover_info();
+            let label = tab.focused.read(cx).label();
+            let hover = tab.focused.read(cx).hover_info();
             strip = strip.child(no_drag(
                 self.render_tab(index, label, hover, active, palette, cx),
             ));
@@ -891,7 +1244,7 @@ impl Render for AppView {
                 div()
                     .flex_1()
                     .min_h_0()
-                    .when_some(active, |area, terminal| area.child(terminal)),
+                    .when_some(active, |area, tab| area.child(self.render_panes(&tab, cx))),
             )
             .when_some(self.picker.as_ref(), |root, (picker, _)| {
                 root.child(picker.clone())

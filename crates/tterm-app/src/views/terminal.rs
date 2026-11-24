@@ -22,6 +22,7 @@ use crate::actions::{Copy, CopyOrInterrupt, Paste};
 use crate::state::box_drawing;
 use crate::state::drop::{DropPreview, size_label};
 use crate::state::links::{self, Link};
+use crate::state::panes::{Direction, PaneKey, PaneSplit, pane_shortcut};
 use crate::state::profiles::{Origin, Profile};
 use crate::state::settings::Settings;
 use crate::theme::PaletteExt as _;
@@ -64,10 +65,20 @@ const READ_BUFFER: usize = 64 * 1024;
 pub enum TerminalEvent {
     /// The title or the folder changed: the tab label may change.
     Renamed,
-    /// The shell exited: its tab closes.
+    /// The shell exited: its pane closes, and its tab with the last pane.
     Exited,
     /// A profile shortcut gpui could not bind on this keyboard layout (Ctrl+Shift+digit).
     OpenProfile(u8),
+    /// The terminal got the focus: it is its tab's active pane (#33).
+    Focused,
+    /// Split this pane (#33): Alt+Shift+Plus, Alt+Shift+Minus, Alt+Shift+D or the menu.
+    Split(PaneSplit),
+    /// Move the focus to the pane next to this one (Alt+arrows, only in a split tab).
+    FocusPane(Direction),
+    /// Move the nearest separator (Alt+Shift+arrows, only in a split tab).
+    ResizePane(Direction),
+    /// Close this pane, from the menu.
+    ClosePane,
 }
 
 /// The size of one cell for the font in use.
@@ -148,6 +159,10 @@ pub struct TerminalView {
     _output: Task<()>,
     /// The focus and blur subscriptions in the tab's window.
     _focus: Vec<Subscription>,
+    /// The profile it runs, for a duplicated pane (#33).
+    profile: Option<Profile>,
+    /// Whether its tab has several panes: Alt+arrows then move between them (#33).
+    split: bool,
 }
 
 /// The size shown over the grid while the window is resized (design C).
@@ -242,6 +257,8 @@ impl TerminalView {
             mouse_pressed: None,
             _output: Task::ready(()),
             _focus: Vec::new(),
+            profile: profile.cloned(),
+            split: false,
         };
         match pty::spawn(&options) {
             Ok((pty, reader)) => {
@@ -297,6 +314,21 @@ impl TerminalView {
                 view.on_focus_change(false, cx)
             }),
         ];
+    }
+
+    /// The profile it runs, for a duplicated pane (#33).
+    pub fn profile(&self) -> Option<&Profile> {
+        self.profile.as_ref()
+    }
+
+    /// Tells the terminal whether its tab has several panes (#33).
+    pub fn set_split(&mut self, split: bool) {
+        self.split = split;
+    }
+
+    /// The size of the terminal's area, for splitting it along its longer side.
+    pub fn area(&self) -> Size<Pixels> {
+        self.grid_area
     }
 
     /// The handle to focus this terminal.
@@ -454,6 +486,7 @@ impl TerminalView {
         let report = self.emulator.encode_focus(focused);
         self.write(&report);
         if focused {
+            cx.emit(TerminalEvent::Focused);
             self.restart_blink(cx);
         } else {
             self.stop_blink();
@@ -586,6 +619,20 @@ impl TerminalView {
         {
             cx.stop_propagation();
             cx.emit(TerminalEvent::OpenProfile(number));
+            return;
+        }
+        // Pane shortcuts (#33): Alt, or Alt+Shift, without Ctrl.
+        if mods.alt
+            && !mods.control
+            && !mods.platform
+            && let Some(key) = pane_shortcut(&keystroke.key, mods.shift, self.split)
+        {
+            cx.stop_propagation();
+            cx.emit(match key {
+                PaneKey::Split(split) => TerminalEvent::Split(split),
+                PaneKey::Focus(direction) => TerminalEvent::FocusPane(direction),
+                PaneKey::Resize(direction) => TerminalEvent::ResizePane(direction),
+            });
             return;
         }
         // Text goes through the input handler (`replace_text_in_range`), as the platform sends it:
@@ -1154,6 +1201,28 @@ impl Render for TerminalView {
                         !has_selection,
                     )
                     .menu(t!("terminal.paste"), Box::new(Paste))
+                    .separator()
+                    .item(pane_item(
+                        &view,
+                        t!("panes.split_right"),
+                        TerminalEvent::Split(PaneSplit::Right),
+                    ))
+                    .item(pane_item(
+                        &view,
+                        t!("panes.split_down"),
+                        TerminalEvent::Split(PaneSplit::Down),
+                    ))
+                    .item(pane_item(
+                        &view,
+                        t!("panes.duplicate"),
+                        TerminalEvent::Split(PaneSplit::Duplicate),
+                    ))
+                    .separator()
+                    .item(pane_item(
+                        &view,
+                        t!("panes.close"),
+                        TerminalEvent::ClosePane,
+                    ))
             }
         });
         let terminal = div()
@@ -1922,4 +1991,17 @@ fn drop_overlay(preview: &DropPreview, palette: &crate::theme::Palette) -> AnyEl
                 ),
         )
         .into_any_element()
+}
+
+/// An item of the terminal's menu that sends `event` to the window (#33).
+fn pane_item(
+    view: &WeakEntity<TerminalView>,
+    label: impl Into<SharedString>,
+    event: TerminalEvent,
+) -> PopupMenuItem {
+    let view = view.clone();
+    PopupMenuItem::new(label).on_click(move |_, _, cx| {
+        let event = event.clone();
+        let _ = view.update(cx, |_, cx| cx.emit(event));
+    })
 }
