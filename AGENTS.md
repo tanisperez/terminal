@@ -158,8 +158,9 @@ The shared rules (section 8) apply in full. On top of that, for tterm:
 
 - Unit tests in every crate. The emulator is tested by feeding escape sequences and reading the
   frame; the pseudo terminal by running `/bin/sh -c ...`.
-- Visual checks in the real app as in the shared rules (section 17): XWayland, `xdotool`,
-  `spectacle`, isolated `XDG_CONFIG_HOME` and `XDG_STATE_HOME`, killing only our own PID.
+- Visual checks in the real app as in the shared rules (section 17): a headless sway
+  (`~/.local/share/wl-test/start.sh`, `keys`, `ptr`, `grim`), isolated `XDG_CONFIG_HOME` and
+  `XDG_STATE_HOME`, killing only our own PID. A dead key is `keys -k dead_acute -k a`.
 - Windows: cross-build with cargo-xwin and `GHOSTTY_VT_PREBUILT_MSVC=1` (the prebuilt
   libghostty-vt links with lld-link), and test in the Windows 11 VM (see the user's memory).
   Cross-build in debug: a release build needs Windows' shader compiler (`fxc`, gpui's
