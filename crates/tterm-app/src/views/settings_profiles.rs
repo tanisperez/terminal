@@ -19,7 +19,7 @@ use super::profile_menu::{CHIP_SIZE, chip, swatch};
 use super::root::AppView;
 
 /// Width of the list of profiles.
-const LIST_WIDTH: f32 = 210.0;
+const LIST_WIDTH: f32 = 268.0;
 /// Height of a row of the list.
 const ROW_HEIGHT: f32 = 32.0;
 
