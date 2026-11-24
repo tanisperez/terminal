@@ -11,7 +11,7 @@ use ghostty_vt::screen::CellWide;
 use ghostty_vt::screen::TrackedGridRef;
 use ghostty_vt::selection::{FormatOptions, SelectLineOptions, SelectWordOptions, Selection};
 use ghostty_vt::style::{Palette, RgbColor, Underline};
-use ghostty_vt::terminal::{CursorStyle, Mode, Point, PointCoordinate, ScrollViewport};
+use ghostty_vt::terminal::{CursorStyle, Mode, Point, PointCoordinate, PointSpace, ScrollViewport};
 use ghostty_vt::{RenderState, Terminal, TerminalOptions, key, mouse};
 
 use crate::frame::{BgSpan, Cursor, CursorShape, Frame, Line, Rgb, Run, ScrollState};
@@ -113,6 +113,8 @@ pub struct Emulator {
     size: GridSize,
     /// Where a mouse selection started, kept by libghostty-vt as the screen scrolls.
     anchor: Option<TrackedGridRef>,
+    /// Whether the drag started on the left half of the anchor's cell.
+    anchor_left: bool,
 }
 
 /// How a selection grows from where the mouse was pressed.
@@ -158,6 +160,7 @@ impl Emulator {
             frame: Frame::default(),
             size,
             anchor: None,
+            anchor_left: true,
         };
         emulator.set_colors(colors)?;
         emulator.set_cursor_style(cursor)?;
@@ -392,15 +395,23 @@ impl Emulator {
         }
     }
 
-    /// Starts a selection at a visible cell: a single click remembers where it started and
-    /// clears the old selection, a double click selects the word and a triple click the line.
-    pub fn select_start(&mut self, col: u16, row: u16, unit: SelectionUnit) -> Result<(), Error> {
+    /// Starts a selection at a visible cell: a single click remembers where it started (and on
+    /// which half of the cell, `left`) and clears the old selection, a double click selects the
+    /// word and a triple click the line.
+    pub fn select_start(
+        &mut self,
+        col: u16,
+        row: u16,
+        left: bool,
+        unit: SelectionUnit,
+    ) -> Result<(), Error> {
         let point = viewport_point(col, row);
         self.anchor = None;
         match unit {
             SelectionUnit::Cell => {
                 self.terminal.set_selection(None)?;
                 self.anchor = Some(self.terminal.track_grid_ref(point)?);
+                self.anchor_left = left;
             }
             SelectionUnit::Word => {
                 let at = self.terminal.grid_ref(point)?;
@@ -416,15 +427,34 @@ impl Emulator {
         Ok(())
     }
 
-    /// Extends a cell selection to a visible cell, as the mouse drags.
-    pub fn select_to(&mut self, col: u16, row: u16) -> Result<(), Error> {
+    /// Extends a cell selection to a visible cell as the mouse drags, `left` when the mouse is
+    /// on the left half of it. A cell is selected only once the drag passes its middle, as in
+    /// Ghostty and kitty (see [`drag_cells`]).
+    pub fn select_to(&mut self, col: u16, row: u16, left: bool) -> Result<(), Error> {
         let Some(anchor) = self.anchor.as_ref() else {
             return Ok(());
         };
-        let Some(start) = anchor.snapshot(&self.terminal)? else {
+        let Some(from) = anchor.point(PointSpace::Screen)? else {
             return Ok(());
         };
-        let end = self.terminal.grid_ref(viewport_point(col, row))?;
+        let here = self.terminal.grid_ref(viewport_point(col, row))?;
+        let Some(to) = self
+            .terminal
+            .point_from_grid_ref(&here, PointSpace::Screen)?
+        else {
+            return Ok(());
+        };
+        let cells = drag_cells(
+            DragPoint::new(from.x, from.y, self.anchor_left),
+            DragPoint::new(to.x, to.y, left),
+            self.size.cols,
+        );
+        let Some((start, end)) = cells else {
+            self.terminal.set_selection(None)?;
+            return Ok(());
+        };
+        let start = self.terminal.grid_ref(screen_point(start))?;
+        let end = self.terminal.grid_ref(screen_point(end))?;
         let selection = Selection::new(start, end, false);
         self.terminal.set_selection(Some(&selection))?;
         Ok(())
@@ -685,6 +715,84 @@ impl LineBuilder {
     }
 }
 
+/// A place of a drag on the whole screen (scrollback included): the cell, and whether the mouse
+/// is on its left half.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct DragPoint {
+    col: u16,
+    row: u32,
+    left: bool,
+}
+
+impl DragPoint {
+    fn new(col: u16, row: u32, left: bool) -> Self {
+        Self { col, row, left }
+    }
+
+    fn cell(self) -> (u16, u32) {
+        (self.col, self.row)
+    }
+}
+
+/// The first and last cells (inclusive, in reading order) a drag from `anchor` to `here`
+/// selects, `None` when it selects nothing. A cell counts once the drag passes its middle: the
+/// anchor's cell when the drag leaves it through the far side, the cell under the mouse when the
+/// mouse is past its middle. A press and release on one half of a cell selects nothing.
+fn drag_cells(anchor: DragPoint, here: DragPoint, cols: u16) -> Option<((u16, u32), (u16, u32))> {
+    let next = |(col, row): (u16, u32)| {
+        if col + 1 < cols {
+            (col + 1, row)
+        } else {
+            (0, row + 1)
+        }
+    };
+    let previous = |(col, row): (u16, u32)| -> Option<(u16, u32)> {
+        if col > 0 {
+            Some((col - 1, row))
+        } else if row > 0 {
+            Some((cols.saturating_sub(1), row - 1))
+        } else {
+            None
+        }
+    };
+    let order = |cell: (u16, u32)| (cell.1, cell.0);
+    let (start, end) = if anchor.cell() == here.cell() {
+        if anchor.left == here.left {
+            return None;
+        }
+        (anchor.cell(), anchor.cell())
+    } else if order(here.cell()) > order(anchor.cell()) {
+        let start = if anchor.left {
+            anchor.cell()
+        } else {
+            next(anchor.cell())
+        };
+        let end = if here.left {
+            previous(here.cell())?
+        } else {
+            here.cell()
+        };
+        (start, end)
+    } else {
+        let start = if here.left {
+            here.cell()
+        } else {
+            next(here.cell())
+        };
+        let end = if anchor.left {
+            previous(anchor.cell())?
+        } else {
+            anchor.cell()
+        };
+        (start, end)
+    };
+    (order(start) <= order(end)).then_some((start, end))
+}
+
+fn screen_point((col, row): (u16, u32)) -> Point {
+    Point::Screen(PointCoordinate { x: col, y: row })
+}
+
 fn viewport_point(col: u16, row: u16) -> Point {
     Point::Viewport(PointCoordinate {
         x: col,
@@ -933,8 +1041,8 @@ mod tests {
         let mut term = emulator(20, 3);
         term.feed(b"hello world\r\nsecond line");
         term.frame().unwrap();
-        term.select_start(6, 0, SelectionUnit::Cell).unwrap();
-        term.select_to(5, 1).unwrap();
+        term.select_start(6, 0, true, SelectionUnit::Cell).unwrap();
+        term.select_to(5, 1, false).unwrap();
         let frame = term.frame().unwrap();
         assert_eq!(frame.lines[0].selection, Some((6, 19)));
         assert_eq!(frame.lines[1].selection, Some((0, 5)));
@@ -949,14 +1057,52 @@ mod tests {
     }
 
     #[test]
+    fn a_dragged_cell_is_selected_once_the_drag_passes_its_middle() {
+        let at = DragPoint::new;
+        // From the left half of `w` (col 6) to the right half of `d` (col 10): "world".
+        assert_eq!(
+            drag_cells(at(6, 0, true), at(10, 0, false), 20),
+            Some(((6, 0), (10, 0)))
+        );
+        // From the right half of the space before it to the left half of the space after it:
+        // the same word, neither space.
+        assert_eq!(
+            drag_cells(at(5, 0, false), at(11, 0, true), 20),
+            Some(((6, 0), (10, 0)))
+        );
+        // Backwards, from the right half of `d` to the left half of `w`.
+        assert_eq!(
+            drag_cells(at(10, 0, false), at(6, 0, true), 20),
+            Some(((6, 0), (10, 0)))
+        );
+        // Within one cell: only when the drag crosses its middle.
+        assert_eq!(drag_cells(at(3, 0, true), at(3, 0, true), 20), None);
+        assert_eq!(
+            drag_cells(at(3, 0, true), at(3, 0, false), 20),
+            Some(((3, 0), (3, 0)))
+        );
+        // From the right half of a cell to the left half of the next one: nothing.
+        assert_eq!(drag_cells(at(3, 0, false), at(4, 0, true), 20), None);
+        // Across lines, wrapping at the last column.
+        assert_eq!(
+            drag_cells(at(19, 0, false), at(0, 1, false), 20),
+            Some(((0, 1), (0, 1)))
+        );
+        assert_eq!(
+            drag_cells(at(2, 1, true), at(0, 0, true), 20),
+            Some(((0, 0), (1, 1)))
+        );
+    }
+
+    #[test]
     fn a_double_click_selects_a_word_and_a_triple_click_the_line() {
         let mut term = emulator(30, 2);
         term.feed(b"cargo build --release");
         term.frame().unwrap();
-        term.select_start(8, 0, SelectionUnit::Word).unwrap();
+        term.select_start(8, 0, true, SelectionUnit::Word).unwrap();
         assert_eq!(term.selection_text().unwrap().as_deref(), Some("build"));
         assert_eq!(term.frame().unwrap().lines[0].selection, Some((6, 10)));
-        term.select_start(8, 0, SelectionUnit::Line).unwrap();
+        term.select_start(8, 0, true, SelectionUnit::Line).unwrap();
         assert_eq!(
             term.selection_text().unwrap().as_deref(),
             Some("cargo build --release")

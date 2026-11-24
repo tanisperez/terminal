@@ -801,17 +801,32 @@ impl TerminalView {
 
     /// The visible cell under a window position, clamped to the grid.
     fn cell_at(&self, position: Point<Pixels>) -> Option<(u16, u16)> {
+        self.cell_side_at(position).map(|(col, row, _)| (col, row))
+    }
+
+    /// The visible cell under a window position, clamped to the grid, and whether the position
+    /// is on its left half (left of the grid counts as the left half of the first column, right
+    /// of it as the right half of the last one).
+    fn cell_side_at(&self, position: Point<Pixels>) -> Option<(u16, u16, bool)> {
         let (_, _, metrics) = self.metrics.as_ref()?;
         let size = self.emulator.size();
         let x = f32::from(position.x - self.grid_origin.x) / f32::from(metrics.width);
         let y = f32::from(position.y - self.grid_origin.y) / f32::from(metrics.height);
-        let col = x.floor().clamp(0.0, f32::from(size.cols - 1)) as u16;
+        let last_col = f32::from(size.cols - 1);
+        let col = x.floor().clamp(0.0, last_col);
         let row = y.floor().clamp(0.0, f32::from(size.rows - 1)) as u16;
-        Some((col, row))
+        let left = if x < 0.0 {
+            true
+        } else if x >= last_col + 1.0 {
+            false
+        } else {
+            x - col < 0.5
+        };
+        Some((col as u16, row, left))
     }
 
     fn on_mouse_down(&mut self, event: &MouseDownEvent, cx: &mut Context<Self>) {
-        let Some((col, row)) = self.cell_at(event.position) else {
+        let Some((col, row, left)) = self.cell_side_at(event.position) else {
             return;
         };
         let unit = match event.click_count {
@@ -820,7 +835,7 @@ impl TerminalView {
             _ => SelectionUnit::Line,
         };
         log::trace!("press at cell {col},{row}, {} clicks", event.click_count);
-        if let Err(error) = self.emulator.select_start(col, row, unit) {
+        if let Err(error) = self.emulator.select_start(col, row, left, unit) {
             log::debug!("selection not started: {error}");
         }
         self.selecting = unit == SelectionUnit::Cell;
@@ -897,10 +912,10 @@ impl TerminalView {
         if !self.selecting || event.pressed_button != Some(MouseButton::Left) {
             return;
         }
-        let Some((col, row)) = self.cell_at(event.position) else {
+        let Some((col, row, left)) = self.cell_side_at(event.position) else {
             return;
         };
-        if let Err(error) = self.emulator.select_to(col, row) {
+        if let Err(error) = self.emulator.select_to(col, row, left) {
             log::debug!("selection not extended: {error}");
         }
         let generation = self.frame.generation;
