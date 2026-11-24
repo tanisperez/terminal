@@ -540,6 +540,12 @@ impl TerminalView {
         if event.prefer_character_input || (plain_text && !self.emulator.reports_all_keys()) {
             return;
         }
+        // A dead key starts a composition: the platform sets the preedit first, then sends the
+        // key without text. On Wayland that key is named by its US position (`'` for the Spanish
+        // acute), so encoding it would type a stray `'` before the composed `á`.
+        if self.preedit.is_some() && !mods.control && !mods.alt && !mods.platform {
+            return;
+        }
         // Command shortcuts belong to the app and the system on macOS.
         if cfg!(target_os = "macos") && keystroke.modifiers.platform {
             return;
