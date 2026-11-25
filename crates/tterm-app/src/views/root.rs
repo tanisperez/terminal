@@ -111,6 +111,9 @@ impl Render for DraggedSeparator {
 const SEPARATOR_WIDTH: f32 = 1.0;
 /// The width of the area around it that takes the mouse.
 const SEPARATOR_GRAB: f32 = 6.0;
+/// How far the line under the bar reaches past the row of tabs at each side: past the window
+/// controls of Windows and the traffic lights of macOS.
+const BAR_LINE_REACH: f32 = 240.0;
 
 impl AppView {
     /// The window with one tab per folder of `dirs`, or one in the home folder.
@@ -840,10 +843,21 @@ impl AppView {
             palette.tab_bar_bg().opacity(opacity),
             palette.tab_bar_border(),
         );
-        let mut row = h_flex().size_full().items_start();
+        // The line under the bar is drawn here, before the tabs, and not as the bar's border:
+        // the active tab, whose bottom edge is the line's, paints over it and joins the
+        // terminal at any scale. It reaches past the row, under the window controls and the
+        // macOS traffic lights; the window clips it.
+        let mut row = h_flex().relative().size_full().items_start().child(
+            div()
+                .absolute()
+                .bottom_0()
+                .left(px(-BAR_LINE_REACH))
+                .right(px(-BAR_LINE_REACH))
+                .h(px(1.0))
+                .bg(border),
+        );
         // Tabs shrink to their minimum; past it the strip clips them and the buttons of the
-        // bar stay in place. Only across: the active tab covers the bar's bottom line, joined
-        // to the terminal.
+        // bar stay in place.
         let mut strip = h_flex()
             .id("tab-strip")
             .items_start()
@@ -852,7 +866,9 @@ impl AppView {
             .gap(px(2.0))
             .min_w_0()
             .flex_shrink(1.0)
-            .overflow_x_hidden()
+            // One pixel below the bar, for the active tab to cover the line (below).
+            .h(px(TAB_BAR_HEIGHT + 1.0))
+            .overflow_hidden()
             // Dropped on the bar past the last tab: the tab moves to the end.
             .on_drop(cx.listener(|view, dragged: &DraggedTab, _, cx| {
                 view.move_tab(dragged.index, usize::MAX, cx)
@@ -916,7 +932,7 @@ impl AppView {
             .h(px(TAB_BAR_HEIGHT))
             .when(!cfg!(target_os = "macos"), |bar| bar.pl(px(0.0)))
             .bg(bar_bg)
-            .border_color(border)
+            .border_b_0()
             .child(row)
     }
 
@@ -985,7 +1001,10 @@ impl AppView {
                 if active {
                     // The active tab comes out of the terminal: its color, joined to it over
                     // the line under the bar (A6).
-                    tab.bg(crate::theme::palette::terminal_bg(cx))
+                    // One pixel past the line under the bar: with a fractional scale the
+                    // tab and the line round to different device pixels.
+                    tab.h(px(TAB_HEIGHT + 1.0))
+                        .bg(crate::theme::palette::terminal_bg(cx))
                         .border_t_1()
                         .border_l_1()
                         .border_r_1()
