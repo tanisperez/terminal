@@ -710,8 +710,10 @@ impl LineBuilder {
         let joins = self.open
             && !cell.wide
             && self.line.runs.last().is_some_and(|run| {
+                // A plain space only pads a run that draws nothing across it: joined to an
+                // underlined or struck through one, it would get the line too.
                 run.col + run.cells == self.col
-                    && (blank
+                    && ((blank && !run.underline && !run.strikethrough)
                         || (run.fg == fg
                             && run.bold == cell.bold
                             && run.italic == cell.italic
@@ -917,6 +919,31 @@ mod tests {
         assert_eq!((frame.cols, frame.rows), (20, 4));
         let cursor = frame.cursor.unwrap();
         assert_eq!((cursor.col, cursor.row), (5, 1));
+    }
+
+    #[test]
+    fn an_underline_stops_where_the_underlined_text_does() {
+        // As Claude Code writes a link: underlined, then plain, then the rest of the line erased.
+        for seq in [
+            &b"see \x1b[4mhttp://x.y\x1b[24m\x1b[K"[..],
+            &b"see \x1b[4mhttp://x.y\x1b[24m   \r\n"[..],
+            &b"see \x1b[4mhttp://x.y\x1b[K\x1b[24m end"[..],
+        ] {
+            let mut term = emulator(30, 2);
+            term.feed(seq);
+            let line = term.frame().unwrap().lines[0].clone();
+            let link = line.runs.iter().find(|run| run.underline).unwrap();
+            assert_eq!(
+                (link.col, link.cells, link.text.as_str()),
+                (4, 10, "http://x.y")
+            );
+        }
+        // Underlined spaces keep their line.
+        let mut term = emulator(30, 2);
+        term.feed(b"\x1b[4ma  b\x1b[24m");
+        let line = term.frame().unwrap().lines[0].clone();
+        assert_eq!(line.runs[0].text, "a  b");
+        assert!(line.runs[0].underline);
     }
 
     #[test]
