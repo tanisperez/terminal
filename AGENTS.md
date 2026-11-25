@@ -51,15 +51,16 @@ Expo/React Native conventions here.
 - Design: the prototype lives in a claude.ai Artifact,
   https://claude.ai/artifact/Q6FaRuYGpdcoaJ2mkMT4nX (canvas "Tanis Terminal", built on telaio's
   design system). UI changes are designed there first; read its boards with the Artifact tool,
-  never a local copy. Boards: A1 tabs, A4 one tab (the bar always shows), C resizing, D dropping
-  a screenshot, E a screenshot pasted into Claude Code, F settings, H2 agent usage, W1/W2
-  Windows profiles, M1 macOS profiles, P1 profile settings, U the bar on the three platforms,
-  T fonts, G the icon, R the update ready in the bar and its restart dialog; for 0.2.0, F2
-  general settings (start folder, opacity), F3 colors, P2 profile order, S1 split panes, X1
-  moving a tab to a new window, A5 the tab tooltip, T2 Nerd Font icons and the font select.
-  For 0.3.0: A7 and A8 the active tab's style (chosen on 2026-11-25: line over the middle
-  half, 2 px, on top; bar #1b1c22; active tab black and joined to the terminal; inactive tabs
-  flat), H3 to H5 ideas for the usage screen.
+  never a local copy. It is a snapshot of the app as it is (0.3.0, 2026-11-25); explorations
+  are dropped once decided. Boards: A1 tabs, A4 one tab (the bar always shows), C resizing, D
+  dropping a screenshot, E a screenshot pasted into Claude Code, F settings, W1/W2 Windows
+  profiles, M1 macOS profiles, P1 profile settings, U the bar on the three platforms, G the
+  icon, R the update ready in the bar and its restart dialog; for 0.2.0, F2 general settings
+  (start folder, opacity), F3 colors, P2 profile order, S1 split panes, X1 moving a tab to a new
+  window, A5 the tab tooltip, T2 Nerd Font icons and the font select; for 0.3.0, A9 the tabs
+  (bar #1b1c22, the active tab black and joined to the terminal with the accent line over its
+  middle half; one, several and too many tabs), K1 the shortcuts on F1, N1 what's new, H3 to H5
+  the usage screen (spend, projects, habits).
 - The tab bar is the title bar and always shows, with one tab too (A4, U, decided on
   2026-11-23). A single tab has no close button: closing it is closing the window. The grid is
   centered across and starts at the top, under the bar (A4, C).
