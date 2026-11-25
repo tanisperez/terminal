@@ -228,6 +228,8 @@ impl UsageView {
             .iter()
             .map(|tab| SessionRow {
                 label: tab.label.clone(),
+                // This user's log folder for the tab's folder, or else any log that names that
+                // folder: a WSL distribution keeps its own (#43).
                 session: home
                     .as_deref()
                     .zip(tab.cwd.as_deref())
@@ -237,6 +239,11 @@ impl UsageView {
                             &tterm_usage::project_folder(home, cwd),
                             system_now,
                         )
+                    })
+                    .or_else(|| {
+                        tab.cwd
+                            .as_deref()
+                            .and_then(|cwd| tterm_usage::latest_session_in(files, cwd, system_now))
                     }),
             })
             .collect();
@@ -872,7 +879,7 @@ fn block_card(block: Option<BlockNow>, palette: &Palette) -> impl IntoElement {
             ))
             .child(t!(
                 "usage.block_projected",
-                share = format!("{:.0}", projected * 100.0)
+                tokens = tterm_usage::compact(block.projected)
             )),
     )
 }

@@ -139,8 +139,8 @@ _version: 2
   en: "%{rate}/min now"
   es: "%{rate}/min ahora"
 "usage.block_projected":
-  en: "at this pace: %{share}% at the end"
-  es: "a este ritmo: %{share} % al cerrar"
+  en: "at this pace: %{tokens} at the end"
+  es: "a este ritmo: %{tokens} al cerrar"
 "usage.open_context":
   en: "Open sessions · context"
   es: "Sesiones abiertas · contexto"

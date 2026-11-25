@@ -103,7 +103,7 @@ pub struct BlockNow {
     pub tokens: u64,
     /// The most tokens a block ever had, this one included.
     pub largest: u64,
-    /// Tokens per minute since its first message.
+    /// Tokens per minute since it started.
     pub per_minute: u64,
     /// Tokens at its end if the rate holds.
     pub projected: u64,
@@ -120,28 +120,29 @@ pub fn current_block(files: &[FileUsage], now: DateTime<Utc>) -> Option<BlockNow
         .map(|m| (m.time, m.input() + m.output))
         .collect();
     messages.sort_by_key(|(time, _)| *time);
-    // (start, first message, tokens)
-    let mut blocks: Vec<(DateTime<Utc>, DateTime<Utc>, u64)> = Vec::new();
+    // (start, tokens)
+    let mut blocks: Vec<(DateTime<Utc>, u64)> = Vec::new();
     for (time, tokens) in messages {
         match blocks.last_mut() {
-            Some((start, _, sum)) if time < *start + BLOCK => *sum += tokens,
+            Some((start, sum)) if time < *start + BLOCK => *sum += tokens,
             _ => {
                 let hour = time
                     .with_minute(0)
                     .and_then(|t| t.with_second(0))
                     .and_then(|t| t.with_nanosecond(0))
                     .unwrap_or(time);
-                blocks.push((hour, time, tokens));
+                blocks.push((hour, tokens));
             }
         }
     }
-    let largest = blocks.iter().map(|(_, _, tokens)| *tokens).max()?;
-    let &(start, first, tokens) = blocks.last()?;
+    let largest = blocks.iter().map(|(_, tokens)| *tokens).max()?;
+    let &(start, tokens) = blocks.last()?;
     let end = start + BLOCK;
     if now >= end || now < start {
         return None;
     }
-    let minutes = (now - first).num_minutes().max(1) as u64;
+    // From the block's start, not its first message: one message alone is no pace.
+    let minutes = (now - start).num_minutes().max(1) as u64;
     let per_minute = tokens / minutes;
     let ends_in = end - now;
     Some(BlockNow {
@@ -826,8 +827,8 @@ mod tests {
         assert_eq!(block.tokens, 300);
         assert_eq!(block.largest, 1000);
         assert_eq!(block.ends_in, Duration::minutes(220));
-        assert_eq!(block.per_minute, 5);
-        assert_eq!(block.projected, 300 + 5 * 220);
+        assert_eq!(block.per_minute, 3);
+        assert_eq!(block.projected, 300 + 3 * 220);
         assert_eq!(current_block(&files, at("2026-11-20T15:00:00Z")), None);
     }
 

@@ -410,9 +410,20 @@ impl TerminalView {
         let found = pty.descendant_named(&["claude"]);
         #[cfg(not(any(target_os = "linux", windows, target_os = "macos")))]
         let found: Option<tterm_term::pty::Foreground> = None;
-        found.map(|program| super::usage::AgentTab {
+        if let Some(program) = found {
+            return Some(super::usage::AgentTab {
+                label: self.label(),
+                cwd: program.cwd,
+            });
+        }
+        // A WSL tab runs its programs inside the distribution, out of sight of Windows: Claude
+        // Code is known by the title it sets, and its folder is the one the shell reported
+        // (OSC 7, from the shell integration that WSL tabs load) before it started (#43).
+        (self.shell_kind == crate::state::shell::ShellKind::Wsl
+            && crate::state::tabs::claude_code_title(&self.emulator.title()).is_some())
+        .then(|| super::usage::AgentTab {
             label: self.label(),
-            cwd: program.cwd,
+            cwd: self.cwd.clone(),
         })
     }
 

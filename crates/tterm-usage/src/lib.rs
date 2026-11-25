@@ -139,10 +139,39 @@ pub fn latest_session(
     folder: &Path,
     now: std::time::SystemTime,
 ) -> Option<Session> {
-    let file = files
-        .iter()
-        .filter(|file| file.path.parent() == Some(folder))
-        .max_by_key(|file| file.modified)?;
+    session_of(
+        files
+            .iter()
+            .filter(|file| file.path.parent() == Some(folder))
+            .max_by_key(|file| file.modified)?,
+        now,
+    )
+}
+
+/// The latest session of an agent that worked in `cwd`, as its log names it: how a tab finds
+/// its agent when the log is not in this user's folder, as in a WSL distribution seen from
+/// Windows (#43). Subagents have logs of their own, in a folder below the session's: left out.
+pub fn latest_session_in(
+    files: &[FileUsage],
+    cwd: &Path,
+    now: std::time::SystemTime,
+) -> Option<Session> {
+    session_of(
+        files
+            .iter()
+            .filter(|file| file.cwd.as_deref() == Some(cwd))
+            .filter(|file| {
+                !file
+                    .path
+                    .components()
+                    .any(|part| part.as_os_str() == "subagents")
+            })
+            .max_by_key(|file| file.modified)?,
+        now,
+    )
+}
+
+fn session_of(file: &FileUsage, now: std::time::SystemTime) -> Option<Session> {
     let times = file
         .messages
         .iter()
@@ -600,6 +629,21 @@ mod tests {
         assert_eq!(session.tokens, 5500 + 55);
         assert_eq!(session.model.as_deref(), Some("Opus 5.5"));
         assert_eq!(latest_session(&list, Path::new("/other"), now), None);
+    }
+
+    #[test]
+    fn a_session_is_found_by_the_folder_its_log_names() {
+        let mut list = files();
+        let now = std::time::SystemTime::now();
+        list[0].cwd = Some(PathBuf::from("/home/me/dev/app"));
+        list[0].modified = Some(now);
+        let mut subagent = list[0].clone();
+        subagent.path = PathBuf::from("/logs/s1/subagents/agent.jsonl");
+        subagent.messages.truncate(1);
+        list.push(subagent);
+        let session = latest_session_in(&list, Path::new("/home/me/dev/app"), now).unwrap();
+        assert_eq!(session.tokens, 5500 + 55);
+        assert_eq!(latest_session_in(&list, Path::new("/home/me"), now), None);
     }
 
     #[test]

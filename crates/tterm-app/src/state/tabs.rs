@@ -165,6 +165,22 @@ pub fn folder_name(path: &std::path::Path, home: Option<&std::path::Path>) -> St
         .unwrap_or_else(|| path.display().to_string())
 }
 
+/// Whether `title` is Claude Code's, and whether it is working: Claude Code titles its terminal
+/// `✳ <topic>` while it waits and `◐ <topic>` or `◑ <topic>` while it works. How a WSL tab, whose
+/// programs Windows cannot see, tells that it runs Claude Code (#43).
+pub fn claude_code_title(title: &str) -> Option<bool> {
+    let mut chars = title.trim_start().chars();
+    let mark = chars.next()?;
+    if chars.next() != Some(' ') {
+        return None;
+    }
+    match mark {
+        '\u{2733}' => Some(false),
+        '\u{25d0}' | '\u{25d1}' => Some(true),
+        _ => None,
+    }
+}
+
 /// A path for the tab's tooltip: under `~` when it is in the home folder (design A5).
 pub fn home_path(path: &std::path::Path, home: Option<&std::path::Path>) -> String {
     match home.and_then(|home| path.strip_prefix(home).ok()) {
@@ -437,5 +453,14 @@ mod tests {
         assert_eq!(paged_offset(0.0, 1000.0, 400.0, true), -360.0);
         assert_eq!(paged_offset(-900.0, 1000.0, 400.0, true), -1000.0);
         assert_eq!(paged_offset(-100.0, 1000.0, 400.0, false), 0.0);
+    }
+
+    #[test]
+    fn claude_code_is_known_by_its_title() {
+        assert_eq!(claude_code_title("\u{2733} Fix the modal"), Some(false));
+        assert_eq!(claude_code_title("\u{25d0} Fix the modal"), Some(true));
+        assert_eq!(claude_code_title("\u{25d1} Claude Code"), Some(true));
+        assert_eq!(claude_code_title("tanis@host: ~"), None);
+        assert_eq!(claude_code_title("\u{2733}"), None);
     }
 }
