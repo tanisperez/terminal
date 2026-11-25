@@ -1,6 +1,7 @@
-//! The Profiles page of Settings (design P1): the detected profiles, which can be hidden or made
-//! the default, and the user's own, edited in a form: name, shell, start folder, start command,
-//! color and shortcut. Text fields apply when they lose the focus or Enter is pressed.
+//! The Profiles page of Settings (design P1): the detected profiles, which can be hidden, made
+//! the default or edited as a copy of the user's that takes their place, and the user's own,
+//! edited in a form: name, shell, start folder, start command, color and shortcut. Text fields
+//! apply when they lose the focus or Enter is pressed.
 
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
@@ -17,7 +18,9 @@ use telaio_ui::components::{
 
 use crate::state::settings::{FONT_SIZE_RANGE, FONT_SIZE_STEP};
 
-use crate::state::profiles::{MAX_SHORTCUT, Origin, ProfileColor, ProfileConfig, moved, ordered};
+use crate::state::profiles::{
+    MAX_SHORTCUT, Origin, ProfileColor, ProfileConfig, customized, moved, ordered,
+};
 use crate::theme::{Palette, PaletteExt as _};
 
 use super::profile_menu::{CHIP_SIZE, chip, swatch};
@@ -233,6 +236,30 @@ impl AppView {
             name,
             ..ProfileConfig::default()
         });
+        let index = settings.profiles.len() - 1;
+        self.apply_settings(settings, window, cx);
+        self.select_profile(ProfileSelection::Own(index), window, cx);
+    }
+
+    /// Makes a detected profile editable: a profile of the user with its name and command takes
+    /// its place, in the same spot of the list.
+    fn customize_profile(&mut self, name: &str, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(detected) = self.detected.iter().find(|profile| profile.name == name) else {
+            return;
+        };
+        let mut settings = self.settings.clone();
+        if settings.profiles.iter().any(|profile| profile.name == name) {
+            return;
+        }
+        if !settings.profile_order.iter().any(|other| other == name) {
+            // Keeps the spot: the new profile would otherwise go after the detected ones.
+            settings.profile_order =
+                ordered(&self.detected, &settings.profiles, &settings.profile_order)
+                    .into_iter()
+                    .map(|(name, _)| name)
+                    .collect();
+        }
+        settings.profiles.push(customized(detected));
         let index = settings.profiles.len() - 1;
         self.apply_settings(settings, window, cx);
         self.select_profile(ProfileSelection::Own(index), window, cx);
@@ -458,13 +485,17 @@ pub fn profiles_section(weak: WeakEntity<AppView>, cx: &App) -> AnyElement {
     let form = match (&selection, view.profile_editor.as_ref()) {
         (Some(ProfileSelection::Own(index)), Some(editor)) if editor.index == *index => {
             view.settings.profiles.get(*index).map(|config| {
+                let replaces_detected = view
+                    .detected
+                    .iter()
+                    .any(|profile| profile.name == config.name);
                 own_form(
                     weak.clone(),
                     editor,
                     config,
+                    replaces_detected,
                     &view.settings,
                     &default_name,
-                    &palette,
                     cx,
                 )
             })
@@ -639,11 +670,12 @@ fn own_form(
     weak: WeakEntity<AppView>,
     editor: &ProfileEditor,
     config: &ProfileConfig,
+    replaces_detected: bool,
     general: &crate::state::settings::Settings,
     default_name: &Option<String>,
-    palette: &Palette,
     cx: &App,
 ) -> AnyElement {
+    let palette = &cx.palette();
     let index = editor.index;
     let mut colors = h_flex().gap(px(8.0));
     for color in ProfileColor::ALL {
@@ -754,8 +786,16 @@ fn own_form(
                 Button::new("profile-delete")
                     .danger()
                     .small()
-                    .icon(IconName::Trash)
-                    .label(t!("profiles.delete"))
+                    // Deleting the copy of a detected profile brings the detected one back.
+                    .map(|button| {
+                        if replaces_detected {
+                            button
+                                .icon(IconName::Undo2)
+                                .label(t!("profiles.restore_detected"))
+                        } else {
+                            button.icon(IconName::Trash).label(t!("profiles.delete"))
+                        }
+                    })
                     .on_click(move |_, window, cx| {
                         let _ =
                             delete.update(cx, |view, cx| view.delete_profile(index, window, cx));
@@ -776,9 +816,30 @@ fn detected_form(
 ) -> AnyElement {
     let toggle = weak.clone();
     let toggle_name = name.clone();
+    let customize = weak.clone();
+    let customize_name = name.clone();
     v_flex()
         .gap(px(14.0))
-        .child(div().font_weight(FontWeight::SEMIBOLD).child(name.clone()))
+        .child(
+            h_flex()
+                .items_center()
+                .justify_between()
+                .gap(px(8.0))
+                .child(div().font_weight(FontWeight::SEMIBOLD).child(name.clone()))
+                .child(
+                    Button::new("profile-customize")
+                        .outline()
+                        .small()
+                        .icon(IconName::SlidersHorizontal)
+                        .label(t!("profiles.customize"))
+                        .tooltip(t!("profiles.customize_tooltip"))
+                        .on_click(move |_, window, cx| {
+                            let name = customize_name.clone();
+                            let _ = customize
+                                .update(cx, |view, cx| view.customize_profile(&name, window, cx));
+                        }),
+                ),
+        )
         .child(labeled_field(
             t!("profiles.shell"),
             div()

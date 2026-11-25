@@ -90,3 +90,12 @@ _version: 2
 "profiles.font_general":
   en: "General's"
   es: "La de General"
+"profiles.customize":
+  en: "Edit"
+  es: "Editar"
+"profiles.customize_tooltip":
+  en: "Edit a copy of this profile, which takes its place"
+  es: "Edita una copia de este perfil, que ocupa su lugar"
+"profiles.restore_detected":
+  en: "Restore the detected profile"
+  es: "Restaurar el perfil detectado"

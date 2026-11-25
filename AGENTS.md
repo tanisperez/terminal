@@ -88,7 +88,9 @@ Expo/React Native conventions here.
 - Profiles (#5, decided on 2026-11-23) live in `settings.toml`: detected profiles are not
   written; the user's own ones are `[[profiles]]` tables (`name`, `shell`, `cwd`, `startup`,
   `color`, `shortcut`), plus `default_profile` and `hidden_profiles`. `startup` is typed into the
-  shell instead of replacing it, so the tab stays open when the program exits.
+  shell instead of replacing it, so the tab stays open when the program exits. A detected
+  profile is edited as a copy of the user's with the same name, which takes its place;
+  deleting the copy brings the detected one back.
 - Milestone 0.2.0 (decided on 2026-11-24): split panes, horizontal and vertical (#33); moving a
   tab to its own window (#34); a configurable color palette whose default is the author's kitty
   one (#30); background transparency, off by default (#31); a start folder for the first tab,

@@ -358,6 +358,33 @@ pub fn split_command(text: &str) -> Vec<String> {
     parts
 }
 
+/// A command as the shell field shows it: the parts joined with spaces, those with spaces of
+/// their own in double quotes, so [`split_command`] gives them back.
+pub fn join_command(parts: &[String]) -> String {
+    parts
+        .iter()
+        .map(|part| {
+            if part.contains(char::is_whitespace) {
+                format!("\"{part}\"")
+            } else {
+                part.clone()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// A profile of the user that replaces the detected `profile` (same name, so the detected one
+/// leaves the lists), for the user to change its folder or anything else.
+pub fn customized(profile: &Profile) -> ProfileConfig {
+    ProfileConfig {
+        name: profile.name.clone(),
+        shell: (!profile.command.is_empty()).then(|| join_command(&profile.command)),
+        color: profile.color,
+        ..ProfileConfig::default()
+    }
+}
+
 /// `~` and `~/...` as paths under `home`.
 pub fn expand_home(path: &str, home: Option<&Path>) -> PathBuf {
     match (path.strip_prefix('~'), home) {
@@ -642,5 +669,22 @@ mod tests {
         assert_eq!(config.shortcut, None);
         let empty: toml::Table = toml::from_str("startup = \"x\"").unwrap_or_default();
         assert_eq!(ProfileConfig::from_toml(&empty), None);
+    }
+
+    #[test]
+    fn a_customized_detected_profile_keeps_its_command() {
+        let detected = Profile::detected(
+            "Ubuntu 24.04",
+            vec!["wsl.exe".into(), "-d".into(), "Ubuntu 24.04".into()],
+            Some("WSL"),
+        );
+        let config = customized(&detected);
+        assert_eq!(config.name, "Ubuntu 24.04");
+        assert_eq!(config.color, ProfileColor::Gray);
+        let shell = config.shell.unwrap_or_default();
+        assert_eq!(shell, "wsl.exe -d \"Ubuntu 24.04\"");
+        assert_eq!(split_command(&shell), detected.command);
+        let login = Profile::detected("zsh", Vec::new(), None);
+        assert_eq!(customized(&login).shell, None);
     }
 }
