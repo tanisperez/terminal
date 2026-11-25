@@ -7037,7 +7037,7 @@ checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
 
 [[package]]
 name = "tterm-app"
-version = "0.3.0"
+version = "0.4.0-dev"
 dependencies = [
  "async-channel",
  "chrono",
@@ -7060,14 +7060,14 @@ dependencies = [
 
 [[package]]
 name = "tterm-cli"
-version = "0.3.0"
+version = "0.4.0-dev"
 dependencies = [
  "telaio-app",
 ]
 
 [[package]]
 name = "tterm-term"
-version = "0.3.0"
+version = "0.4.0-dev"
 dependencies = [
  "ghostty-vt",
  "log",
@@ -7080,7 +7080,7 @@ dependencies = [
 
 [[package]]
 name = "tterm-usage"
-version = "0.3.0"
+version = "0.4.0-dev"
 dependencies = [
  "chrono",
  "log",
