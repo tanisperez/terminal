@@ -842,7 +842,8 @@ impl AppView {
         );
         let mut row = h_flex().size_full().items_start();
         // Tabs shrink to their minimum; past it the strip clips them and the buttons of the
-        // bar stay in place.
+        // bar stay in place. Only across: the active tab covers the bar's bottom line, joined
+        // to the terminal.
         let mut strip = h_flex()
             .id("tab-strip")
             .items_start()
@@ -851,7 +852,7 @@ impl AppView {
             .gap(px(2.0))
             .min_w_0()
             .flex_shrink(1.0)
-            .overflow_hidden()
+            .overflow_x_hidden()
             // Dropped on the bar past the last tab: the tab moves to the end.
             .on_drop(cx.listener(|view, dragged: &DraggedTab, _, cx| {
                 view.move_tab(dragged.index, usize::MAX, cx)
