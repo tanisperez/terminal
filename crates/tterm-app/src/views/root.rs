@@ -17,7 +17,7 @@ use telaio_ui::components::{CloseScope, TabMenuTarget, close_item};
 
 use crate::actions::{
     CONTEXT, CloseTab, MoveTabToNewWindow, NewTab, NextTab, OpenProfile, OpenProfilePicker,
-    OpenSettings, OpenUsage, PreviousTab, ZoomIn, ZoomOut, ZoomReset,
+    OpenSettings, OpenShortcuts, OpenUsage, PreviousTab, ZoomIn, ZoomOut, ZoomReset,
 };
 use crate::state::profiles::{self, Profile, Profiles};
 use crate::state::settings::{
@@ -786,6 +786,12 @@ impl AppView {
         cx.notify();
     }
 
+    /// Opens the keyboard shortcuts cheat sheet (telaio's), listing `state::shortcuts`. A no-op
+    /// while another dialog shows.
+    fn open_shortcuts(&mut self, _: &OpenShortcuts, window: &mut Window, cx: &mut Context<Self>) {
+        telaio_ui::components::open_shortcuts_dialog(crate::state::shortcuts::groups(), window, cx);
+    }
+
     fn open_settings(&mut self, _: &OpenSettings, window: &mut Window, cx: &mut Context<Self>) {
         self.prepare_settings(window, cx);
         super::settings::open(cx.weak_entity(), window, cx);
@@ -1195,6 +1201,7 @@ impl Render for AppView {
                 .key_context(CONTEXT)
                 .size_full()
                 .on_action(cx.listener(Self::open_settings))
+                .on_action(cx.listener(Self::open_shortcuts))
                 .child(usage.clone())
                 .into_any_element();
         }
@@ -1244,6 +1251,7 @@ impl Render for AppView {
             .on_action(cx.listener(Self::zoom_out))
             .on_action(cx.listener(Self::zoom_reset))
             .on_action(cx.listener(Self::open_settings))
+            .on_action(cx.listener(Self::open_shortcuts))
             .on_action(cx.listener(Self::open_usage))
             .on_action(cx.listener(Self::open_picker))
             .child(self.render_bar(&palette, cx))

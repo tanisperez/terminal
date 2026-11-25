@@ -45,6 +45,8 @@ actions!(
         OpenUsage,
         /// Closes the agent usage screen (`Esc`).
         CloseUsage,
+        /// Opens the keyboard shortcuts cheat sheet (`F1`, `Cmd+Shift+/`).
+        OpenShortcuts,
         /// Moves the active tab to a new window, still running (`Ctrl+Shift+N`, `Cmd+Shift+N`).
         MoveTabToNewWindow,
     ]
@@ -105,6 +107,11 @@ pub fn bind_keys(cx: &mut App) {
         KeyBinding::new("tab", NoAction, terminal),
         KeyBinding::new("shift-tab", NoAction, terminal),
     ]);
+    cx.bind_keys([KeyBinding::new(
+        telaio_ui::components::OPEN_SHORTCUTS_KEYSTROKE,
+        OpenShortcuts,
+        context,
+    )]);
     cx.bind_keys(
         (1..=crate::state::profiles::MAX_SHORTCUT)
             .zip(PROFILE_KEYS)

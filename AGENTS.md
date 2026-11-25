@@ -129,6 +129,9 @@ tterm-app ──> tterm-term ──> ghostty-vt, portable-pty
   input; `views/root.rs` holds the tabs and the bar; `views/settings.rs` the Settings dialog.
   UI state that can be tested without a window lives in `state/`.
 
+The keyboard shortcuts cheat sheet (F1, `Cmd+Shift+/` on macOS) is telaio's, listing
+`state/shortcuts.rs`: a new binding gets a row there. It has no button, as decided on 2026-11-25.
+
 How keys reach the shell: gpui's key bindings first (the app's shortcuts), then
 `TerminalView::on_key_down` for keys without text (Enter, arrows, Ctrl and Alt combinations),
 encoded by libghostty-vt. Text goes through the view's input handler (`EntityInputHandler`,

@@ -1,0 +1,77 @@
+# The keyboard shortcuts cheat sheet (state/shortcuts.rs), opened with F1.
+_version: 2
+"shortcuts.group.tabs":
+  en: "Tabs"
+  es: "Pestañas"
+"shortcuts.group.panes":
+  en: "Panes"
+  es: "Paneles"
+"shortcuts.group.terminal":
+  en: "Terminal"
+  es: "Terminal"
+"shortcuts.group.window":
+  en: "Window"
+  es: "Ventana"
+"shortcuts.key.click":
+  en: "Click"
+  es: "Clic"
+"shortcuts.action.new_tab":
+  en: "New tab with the default profile"
+  es: "Nueva pestaña con el perfil por defecto"
+"shortcuts.action.profile_picker":
+  en: "Choose a profile"
+  es: "Elegir un perfil"
+"shortcuts.action.open_profile":
+  en: "New tab with the profile of that number"
+  es: "Nueva pestaña con el perfil de ese número"
+"shortcuts.action.close":
+  en: "Close the pane, or the tab with its last pane"
+  es: "Cerrar el panel, o la pestaña con su último panel"
+"shortcuts.action.next_tab":
+  en: "Next tab"
+  es: "Pestaña siguiente"
+"shortcuts.action.previous_tab":
+  en: "Previous tab"
+  es: "Pestaña anterior"
+"shortcuts.action.move_to_window":
+  en: "Move the tab to a new window"
+  es: "Mover la pestaña a una ventana nueva"
+"shortcuts.action.split_right":
+  en: "Split to the right"
+  es: "Dividir a la derecha"
+"shortcuts.action.split_down":
+  en: "Split down"
+  es: "Dividir hacia abajo"
+"shortcuts.action.split_duplicate":
+  en: "Split where there is more room"
+  es: "Dividir donde haya más sitio"
+"shortcuts.action.pane_focus":
+  en: "Go to the pane next to it"
+  es: "Ir al panel de al lado"
+"shortcuts.action.pane_resize":
+  en: "Resize the pane"
+  es: "Cambiar el tamaño del panel"
+"shortcuts.action.copy":
+  en: "Copy the selection, or interrupt without one"
+  es: "Copiar la selección, o interrumpir si no hay"
+"shortcuts.action.copy_only":
+  en: "Copy the selection"
+  es: "Copiar la selección"
+"shortcuts.action.paste":
+  en: "Paste"
+  es: "Pegar"
+"shortcuts.action.open_link":
+  en: "Open the link under the mouse"
+  es: "Abrir el enlace bajo el ratón"
+"shortcuts.action.zoom_in":
+  en: "Bigger text"
+  es: "Texto más grande"
+"shortcuts.action.zoom_out":
+  en: "Smaller text"
+  es: "Texto más pequeño"
+"shortcuts.action.zoom_reset":
+  en: "Text size from Settings"
+  es: "Tamaño de texto de la configuración"
+"shortcuts.action.settings":
+  en: "Settings"
+  es: "Configuración"
