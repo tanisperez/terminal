@@ -1935,7 +1935,6 @@ fn resize_overlay(
                 .size_full()
                 .items_center()
                 .justify_center()
-                .gap(px(6.0))
                 .child(
                     div()
                         .font_family(mono_font)
@@ -1943,12 +1942,6 @@ fn resize_overlay(
                         .font_weight(FontWeight::SEMIBOLD)
                         .text_color(palette.fg)
                         .child(format!("{cols} \u{d7} {rows}")),
-                )
-                .child(
-                    div()
-                        .text_size(px(12.5))
-                        .text_color(palette.accent_text)
-                        .child(rust_i18n::t!("resize.hint")),
                 ),
         );
     match state {
