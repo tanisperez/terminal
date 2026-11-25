@@ -524,12 +524,29 @@ impl Emulator {
             offset: scrollbar.offset,
             len: scrollbar.len,
         };
-        if dirty == Dirty::Clean && scroll == frame.scroll {
-            return Ok(());
-        }
         let colors = snapshot.colors()?;
         let background = from_vt(colors.background);
         let foreground = from_vt(colors.foreground);
+        // Read every time: moving the cursor alone marks no row dirty, as a program that moves
+        // it over a typed space at the end of a line does (#45).
+        let cursor = snapshot.cursor()?;
+        let cursor_color = colors.cursor.map(from_vt).unwrap_or(foreground);
+        let cursor = cursor.viewport.filter(|_| cursor.visible).map(|at| Cursor {
+            col: at.x,
+            row: at.y,
+            shape: match cursor.visual_style {
+                CursorVisualStyle::Bar => CursorShape::Bar,
+                CursorVisualStyle::Underline => CursorShape::Underline,
+                CursorVisualStyle::BlockHollow => CursorShape::HollowBlock,
+                _ => CursorShape::Block,
+            },
+            color: cursor_color,
+            blinking: cursor.blinking,
+            wide: at.at_wide_tail,
+        });
+        if dirty == Dirty::Clean && scroll == frame.scroll && cursor == frame.cursor {
+            return Ok(());
+        }
         let grid_rows = usize::from(snapshot.rows()?);
         let full = dirty == Dirty::Full
             || frame.lines.len() != grid_rows
@@ -582,21 +599,7 @@ impl Emulator {
                 y += 1;
             }
         }
-        let cursor = snapshot.cursor()?;
-        let cursor_color = colors.cursor.map(from_vt).unwrap_or(foreground);
-        frame.cursor = cursor.viewport.filter(|_| cursor.visible).map(|at| Cursor {
-            col: at.x,
-            row: at.y,
-            shape: match cursor.visual_style {
-                CursorVisualStyle::Bar => CursorShape::Bar,
-                CursorVisualStyle::Underline => CursorShape::Underline,
-                CursorVisualStyle::BlockHollow => CursorShape::HollowBlock,
-                _ => CursorShape::Block,
-            },
-            color: cursor_color,
-            blinking: cursor.blinking,
-            wide: at.at_wide_tail,
-        });
+        frame.cursor = cursor;
         frame.cols = snapshot.cols()?;
         frame.rows = grid_rows as u16;
         frame.background = background;
@@ -952,6 +955,16 @@ mod tests {
         assert_eq!((wide.col, wide.cells), (1, 2));
         let after = line.runs.iter().find(|run| run.text == "b").unwrap();
         assert_eq!(after.col, 3);
+    }
+
+    #[test]
+    fn a_cursor_that_only_moves_is_in_the_next_frame() {
+        let mut term = emulator(10, 2);
+        term.feed(b"ab");
+        assert_eq!(term.frame().unwrap().cursor.map(|c| c.col), Some(2));
+        // A typed space at the end of a line: the program moves the cursor and writes nothing.
+        term.feed(b"\x1b[1C");
+        assert_eq!(term.frame().unwrap().cursor.map(|c| c.col), Some(3));
     }
 
     #[test]
