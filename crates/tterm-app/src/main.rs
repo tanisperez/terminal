@@ -88,6 +88,16 @@ fn main() -> ExitCode {
         return ExitCode::SUCCESS;
     }
 
+    // What's new, once after an update. The last version that ran is read before anything is
+    // written (a first run has no files yet), and recorded before the window opens, so a crash
+    // or a second window never shows it twice.
+    let last_seen = state::config::last_seen_version();
+    let show_whats_new = state::whats_new::opens_at_startup(
+        state::whats_new::VERSION,
+        &last_seen,
+        state::whats_new::NOTES.is_some(),
+    );
+
     // Settings first, for the log level: the logger is installed before anything else runs.
     let settings = state::settings::load_settings();
     let log_env_var = logging::env_var(&IDENTITY);
@@ -102,6 +112,14 @@ fn main() -> ExitCode {
     );
     if let Some(value) = env_level.filter(|_| !from_env) {
         log::warn!("ignoring {log_env_var}={value:?}: not a log level");
+    }
+
+    if state::whats_new::records(state::whats_new::VERSION) {
+        state::config::record_version(state::whats_new::VERSION);
+    }
+    if show_whats_new {
+        log::info!("updated since {last_seen:?}, opening what's new");
+        views::whats_new::open_at_startup();
     }
 
     let language = state::locale::resolve(settings.language);

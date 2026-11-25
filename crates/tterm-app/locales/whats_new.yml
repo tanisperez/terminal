@@ -1,0 +1,14 @@
+# What's new, the modal shown once after an update (views/whats_new.rs).
+_version: 2
+"whats_new.title":
+  en: "What's new in %{version}"
+  es: "Novedades de la %{version}"
+"whats_new.release_page":
+  en: "Release page"
+  es: "Página de la versión"
+"whats_new.close":
+  en: "Close"
+  es: "Cerrar"
+"whats_new.no_notes":
+  en: "The notes of this version are not written yet."
+  es: "Las notas de esta versión aún no están escritas."

@@ -9,6 +9,7 @@ mod settings_profiles;
 mod terminal;
 mod update;
 mod usage;
+pub mod whats_new;
 
 pub use root::{AppView, Tab};
 

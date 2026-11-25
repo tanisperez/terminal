@@ -139,6 +139,11 @@ tterm-app ──> tterm-term ──> ghostty-vt, portable-pty
   input; `views/root.rs` holds the tabs and the bar; `views/settings.rs` the Settings dialog.
   UI state that can be tested without a window lives in `state/`.
 
+What's new (decided on 2026-11-25) opens once after an update, in a modal over the terminal
+(`views/whats_new.rs`): the notes are `release-notes/X.Y.Z.md`, embedded by `build.rs`, and the
+last version that ran is `last-version.txt` in the config folder. A stable release needs its
+notes (a test fails without them).
+
 The keyboard shortcuts cheat sheet (F1, `Cmd+Shift+/` on macOS) is telaio's, listing
 `state/shortcuts.rs`: a new binding gets a row there. It has no button, as decided on 2026-11-25.
 
@@ -185,7 +190,7 @@ The shared rules (section 8) apply in full. On top of that, for tterm:
   `tterm-app`'s Cargo.toml); without it they are read from the build machine's disk and every
   icon is empty in the VM.
 - Debug hooks, read once at startup: `TTERM_LOG=<level>`, `TTERM_OPEN=<state>` (`settings`,
-  `settings-profiles`, `settings-about`, `usage`), `TTERM_UPDATE_URL=<latest.json>` (in a build
+  `settings-profiles`, `settings-about`, `usage`, `whats-new`), `TTERM_UPDATE_URL=<latest.json>` (in a build
   made with `TTERM_UPDATER=github`, checks this manifest instead of GitHub's).
 
 ## Working rules

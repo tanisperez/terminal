@@ -237,6 +237,13 @@ impl AppView {
         self.tabs.activate(0);
         self.focus_active(window, cx);
         self.schedule_startup_update_check(cx);
+        // What's new once after an update, or with the debug hook. A dialog needs the window's
+        // `Root`, which does not exist yet: wait one tick.
+        if super::whats_new::take_pending()
+            || std::env::var("TTERM_OPEN").is_ok_and(|open| open.trim() == "whats-new")
+        {
+            window.defer(cx, super::whats_new::open);
+        }
         // Debug hooks (AGENTS.md): start on the usage screen, or with Settings open on a page.
         if std::env::var("TTERM_OPEN").is_ok_and(|open| open.trim() == "usage") {
             self.open_usage(&OpenUsage, window, cx);

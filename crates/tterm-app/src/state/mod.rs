@@ -14,4 +14,5 @@ pub mod shell;
 pub mod shortcuts;
 pub mod tabs;
 pub mod update;
+pub mod whats_new;
 pub mod window;
