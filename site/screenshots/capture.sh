@@ -74,6 +74,8 @@ startup = "show"
 color = "green"
 EOF
     printf 'width = 1200.0\nheight = 750.0\nmaximized = false\n' > "$HOME_DIR/.config/tterm/window.toml"
+    # This version already ran, so What's new does not open over the screenshots.
+    sed -n 's/^version = "\(.*\)"/\1/p' "$ROOT/Cargo.toml" > "$HOME_DIR/.config/tterm/last-version.txt"
 }
 
 WID=""

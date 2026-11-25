@@ -118,8 +118,8 @@ _version: 2
   en: "Cache"
   es: "Caché"
 "usage.cache_note":
-  en: "of the input comes from the cache"
-  es: "de la entrada sale de la caché"
+  en: "of the input, read from cache"
+  es: "de la entrada, leída de caché"
 "usage.per_task":
   en: "%{tokens} tokens/task"
   es: "%{tokens} tokens/tarea"

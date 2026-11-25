@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Writes 60 days (this period and the one before) of made up Claude Code logs under HOME/.claude/projects for the usage
-screenshot: only the fields tterm reads (usage numbers, no content)."""
+screenshot: only the fields tterm reads (usage numbers, the folder, no content). Today's session of the
+first project started under an hour ago, so a 5-hour block is running."""
 import datetime, json, os, random, re, sys
 
 home = sys.argv[1]
@@ -13,19 +14,27 @@ for project in ["terminal", "postino", "telaio"]:
     folder = os.path.join(home, ".claude", "projects", re.sub(r"[^A-Za-z0-9]", "-", cwd))
     os.makedirs(folder, exist_ok=True)
     for day in range(60):
-        if random.random() < 0.25:
+        if random.random() < 0.25 and not (day == 0 and project == "terminal"):
             continue
-        start = now - datetime.timedelta(days=day, hours=random.randint(1, 8))
+        if day == 0 and project == "terminal":
+            start = now - datetime.timedelta(minutes=50)
+        elif day == 0:
+            # Before the running block, so the block starts with the session above.
+            start = now - datetime.timedelta(hours=random.randint(6, 9))
+        else:
+            start = now - datetime.timedelta(days=day, hours=random.randint(1, 8))
         session = f"{project}-{day}"
         lines = []
         for task in range(random.randint(1, 4)):
             t = start + datetime.timedelta(minutes=task * 25)
+            if t > now - datetime.timedelta(minutes=12):
+                break
             lines.append({"type": "user", "timestamp": t.isoformat().replace("+00:00", "Z"),
-                          "sessionId": session, "message": {"role": "user", "content": "x"}})
+                          "sessionId": session, "cwd": cwd, "message": {"role": "user", "content": "x"}})
             for answer in range(random.randint(4, 12)):
                 t2 = t + datetime.timedelta(minutes=answer)
                 lines.append({"type": "assistant", "timestamp": t2.isoformat().replace("+00:00", "Z"),
-                              "sessionId": session,
+                              "sessionId": session, "cwd": cwd,
                               "message": {"id": f"{session}-{task}-{answer}", "model": random.choice(models),
                                           "usage": {"input_tokens": random.randint(200, 4000),
                                                     "cache_creation_input_tokens": random.randint(2000, 30000),

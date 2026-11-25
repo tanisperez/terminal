@@ -1073,7 +1073,7 @@ fn cost_chart(insights: &Insights, start: NaiveDate, palette: &Palette) -> impl 
         .child(
             h_flex()
                 .gap(px(10.0))
-                .child(y_axis(money(top), money(top / 2.0), palette))
+                .child(y_axis(axis_money(top), axis_money(top / 2.0), palette))
                 .child(
                     div()
                         .relative()
@@ -1767,6 +1767,15 @@ fn money(value: f64) -> String {
     }
 }
 
+/// Dollars on an axis: whole ones from $10, as `$98` rather than `$98.19`.
+fn axis_money(value: f64) -> String {
+    if (10.0..1000.0).contains(&value) {
+        format!("${value:.0}")
+    } else {
+        money(value)
+    }
+}
+
 /// A share as a percentage, `<1%` for a small one that is not zero.
 fn percent(share: f64) -> String {
     let value = share * 100.0;
@@ -1815,7 +1824,7 @@ fn ago(time: DateTime<Utc>, now: DateTime<Utc>) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{heat_step, money, short_duration};
+    use super::{axis_money, heat_step, money, short_duration};
     use pretty_assertions::assert_eq;
 
     #[test]
@@ -1824,6 +1833,8 @@ mod tests {
         assert_eq!(money(41.2), "$41.20");
         assert_eq!(money(597.44), "$597");
         assert_eq!(money(1286.7), "$1.29K");
+        assert_eq!(axis_money(98.19), "$98");
+        assert_eq!(axis_money(4.5), "$4.50");
     }
 
     #[test]
