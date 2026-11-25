@@ -308,6 +308,24 @@ impl Emulator {
         if is_modifier(&input.key) {
             return Vec::new();
         }
+        // Ctrl+Backspace deletes a word at the prompt. The legacy encoding is ^H, which shells
+        // bind to deleting one character, so it sends Alt+Backspace (ESC DEL) instead, bound to
+        // backward-kill-word by zsh, bash and fish. A full screen program, or one that speaks
+        // the Kitty protocol, still gets the key as it is.
+        if input.key == "backspace"
+            && input.mods
+                == (crate::Modifiers {
+                    ctrl: true,
+                    ..crate::Modifiers::NONE
+                })
+            && !self.alternate_screen()
+            && self
+                .terminal
+                .kitty_keyboard_flags()
+                .is_ok_and(|flags| flags.is_empty())
+        {
+            return b"\x1b\x7f".to_vec();
+        }
         let action = if input.repeat {
             key::Action::Repeat
         } else {
@@ -1077,6 +1095,20 @@ mod tests {
             term.encode_key(&KeyInput::named("shift", Modifiers::NONE)),
             b""
         );
+    }
+
+    #[test]
+    fn ctrl_backspace_deletes_a_word_at_the_prompt() {
+        let mut term = emulator(10, 2);
+        let ctrl_backspace = KeyInput::named("backspace", ctrl());
+        assert_eq!(term.encode_key(&ctrl_backspace), b"\x1b\x7f");
+        // A full screen program gets the legacy ^H.
+        term.feed(b"\x1b[?1049h");
+        assert_eq!(term.encode_key(&ctrl_backspace), b"\x08");
+        term.feed(b"\x1b[?1049l");
+        // A program on the Kitty protocol gets the key with its modifiers.
+        term.feed(b"\x1b[>1u");
+        assert_eq!(term.encode_key(&ctrl_backspace), b"\x1b[127;5u");
     }
 
     #[test]
