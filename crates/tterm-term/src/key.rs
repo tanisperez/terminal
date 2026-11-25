@@ -116,10 +116,12 @@ pub struct MouseInput {
     pub action: MouseAction,
     /// The button, `None` for a move with no button down.
     pub button: Option<MouseButton>,
-    /// The position from the top left corner of the grid, in pixels.
-    pub x: f32,
-    /// The position from the top left corner of the grid, in pixels.
-    pub y: f32,
+    /// The position from the top left corner of the grid, in cells (2.5 is the middle of the
+    /// third column). Not in pixels: the cell the app paints is rarely a whole number of them,
+    /// while the encoder divides by the whole pixels of [`crate::GridSize`].
+    pub col: f32,
+    /// The position from the top left corner of the grid, in rows.
+    pub row: f32,
     /// The modifiers held.
     pub mods: Modifiers,
     /// Whether some button is down (for motion while dragging).

@@ -345,13 +345,14 @@ impl Emulator {
             return Vec::new();
         }
         let size = self.size;
+        let (cell_width, cell_height) = (size.cell_width_px.max(1), size.cell_height_px.max(1));
         self.mouse
             .set_options_from_terminal(&self.terminal)
             .set_size(mouse::EncoderSize {
-                screen_width: u32::from(size.cols) * size.cell_width_px.max(1),
-                screen_height: u32::from(size.rows) * size.cell_height_px.max(1),
-                cell_width: size.cell_width_px.max(1),
-                cell_height: size.cell_height_px.max(1),
+                screen_width: u32::from(size.cols) * cell_width,
+                screen_height: u32::from(size.rows) * cell_height,
+                cell_width,
+                cell_height,
                 padding_top: 0,
                 padding_bottom: 0,
                 padding_right: 0,
@@ -373,9 +374,10 @@ impl Emulator {
                 MouseButton::WheelDown => mouse::Button::Five,
             }))
             .set_mods(input.mods.to_ghostty())
+            // In the encoder's pixels, so it finds the same cell the app does.
             .set_position(mouse::Position {
-                x: input.x,
-                y: input.y,
+                x: input.col * cell_width as f32,
+                y: input.row * cell_height as f32,
             });
         let mut out = Vec::new();
         if let Err(error) = self.mouse.encode_to_vec(&self.mouse_event, &mut out) {
@@ -1047,12 +1049,12 @@ mod tests {
     }
 
     fn click(action: MouseAction, button: Option<MouseButton>, col: f32, row: f32) -> MouseInput {
-        // GridSize::default() cells are 8 x 16 pixels; aim at the middle of the cell.
+        // Aim at the middle of the cell.
         MouseInput {
             action,
             button,
-            x: col * 8.0 + 4.0,
-            y: row * 16.0 + 8.0,
+            col: col + 0.5,
+            row: row + 0.5,
             mods: Modifiers::NONE,
             any_pressed: false,
         }
@@ -1070,6 +1072,27 @@ mod tests {
         assert_eq!(term.encode_mouse(&release), b"\x1b[<0;3;2m");
         let wheel = click(MouseAction::Press, Some(MouseButton::WheelDown), 0.0, 0.0);
         assert_eq!(term.encode_mouse(&wheel), b"\x1b[<65;1;1M");
+    }
+
+    #[test]
+    fn mouse_reports_name_the_cell_under_the_mouse_far_to_the_right() {
+        // CaskaydiaCove at 12 pt is 9.375 px wide, reported as 9 px: a click on the middle of
+        // column 100 (937.5 px into the grid) must still report column 100, not 104 (#44).
+        let mut term = Emulator::new(
+            GridSize {
+                cols: 120,
+                rows: 30,
+                cell_width_px: 9,
+                cell_height_px: 20,
+            },
+            &SCHEME,
+            CursorStyleChoice::Block,
+            1_000_000,
+        )
+        .expect("a terminal");
+        term.feed(b"\x1b[?1000h\x1b[?1006h");
+        let press = click(MouseAction::Press, Some(MouseButton::Left), 100.0, 25.0);
+        assert_eq!(term.encode_mouse(&press), b"\x1b[<0;101;26M");
     }
 
     #[test]

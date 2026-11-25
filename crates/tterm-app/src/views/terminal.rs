@@ -698,13 +698,14 @@ impl TerminalView {
             } else {
                 tterm_term::MouseButton::WheelDown
             };
+            let (col, row) = self.grid_position(event.position).unwrap_or_default();
             let mut bytes = Vec::new();
             for _ in 0..lines.abs() as usize {
                 bytes.extend(self.emulator.encode_mouse(&MouseInput {
                     action: MouseAction::Press,
                     button: Some(button),
-                    x: f32::from(event.position.x - self.grid_origin.x),
-                    y: f32::from(event.position.y - self.grid_origin.y),
+                    col,
+                    row,
                     mods: mods_of(event.modifiers),
                     any_pressed: false,
                 }));
@@ -839,11 +840,15 @@ impl TerminalView {
             Some(_) => return false,
             None => None,
         };
+        // Before the first layout there is no grid to point at.
+        let Some((col, row)) = self.grid_position(position) else {
+            return true;
+        };
         let input = MouseInput {
             action,
             button,
-            x: f32::from(position.x - self.grid_origin.x),
-            y: f32::from(position.y - self.grid_origin.y),
+            col,
+            row,
             mods: mods_of(modifiers),
             any_pressed: self.mouse_pressed.is_some(),
         };
@@ -900,6 +905,17 @@ impl TerminalView {
             MouseButton::Middle => self.paste_primary(cx),
             _ => {}
         }
+    }
+
+    /// A window position in cells from the top left corner of the grid, not clamped (2.5 is the
+    /// middle of the third column), for the mouse reports of a program. `None` before the first
+    /// layout.
+    fn grid_position(&self, position: Point<Pixels>) -> Option<(f32, f32)> {
+        let (_, _, metrics) = self.metrics.as_ref()?;
+        Some((
+            f32::from(position.x - self.grid_origin.x) / f32::from(metrics.width),
+            f32::from(position.y - self.grid_origin.y) / f32::from(metrics.height),
+        ))
     }
 
     /// The visible cell under a window position, clamped to the grid.
