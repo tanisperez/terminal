@@ -84,7 +84,7 @@ pub trait TerminalColors {
 impl TerminalColors for Palette {
     fn tab_bar_bg(&self) -> Hsla {
         if self.dark {
-            rgb(Rgb::hex(0x111115))
+            rgb(Rgb::hex(0x1b1c22))
         } else {
             rgb(Rgb::hex(0xf3f4f6))
         }
@@ -92,7 +92,7 @@ impl TerminalColors for Palette {
 
     fn tab_bar_border(&self) -> Hsla {
         if self.dark {
-            rgb(Rgb::hex(0x23252c))
+            rgb(Rgb::hex(0x2a2c34))
         } else {
             rgb(Rgb::hex(0xe3e5ea))
         }

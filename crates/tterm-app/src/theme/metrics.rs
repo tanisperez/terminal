@@ -1,4 +1,4 @@
-//! Named layout constants, from the design (Artifact boards A1, A2, U). Views read sizes only from
+//! Named layout constants, from the design (Artifact boards A1, A2, A8, U). Views read sizes only from
 //! here, never as a literal, so every size in the app traces back to one place.
 
 // The sizes of the standard components and the radius scale, shared with the other apps.
@@ -23,6 +23,9 @@ pub const TAB_MAX_WIDTH: f32 = 168.0;
 pub const TAB_MIN_WIDTH: f32 = 72.0;
 /// Height of the accent line on top of the active tab.
 pub const TAB_ACCENT_HEIGHT: f32 = 2.0;
+/// Space at each side of the accent line, as a fraction of the tab: the line covers the middle
+/// half (A8).
+pub const TAB_ACCENT_INSET: f32 = 0.25;
 /// Size of the prompt icon of a tab.
 pub const TAB_ICON_SIZE: f32 = 14.0;
 /// Side of the close button of a tab.

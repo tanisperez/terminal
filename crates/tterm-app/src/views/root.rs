@@ -25,9 +25,9 @@ use crate::state::settings::{
 };
 use crate::state::tabs::Tabs;
 use crate::theme::metrics::{
-    BAR_BUTTON_SIZE, BAR_BUTTON_TOP, RADIUS_SM, TAB_ACCENT_HEIGHT, TAB_BAR_HEIGHT, TAB_CLOSE_SIZE,
-    TAB_HEIGHT, TAB_ICON_SIZE, TAB_MAX_WIDTH, TAB_MIN_WIDTH, TAB_RADIUS, TAB_STRIP_LEFT,
-    TAB_TOP_GAP,
+    BAR_BUTTON_SIZE, BAR_BUTTON_TOP, RADIUS_SM, TAB_ACCENT_HEIGHT, TAB_ACCENT_INSET,
+    TAB_BAR_HEIGHT, TAB_CLOSE_SIZE, TAB_HEIGHT, TAB_ICON_SIZE, TAB_MAX_WIDTH, TAB_MIN_WIDTH,
+    TAB_RADIUS, TAB_STRIP_LEFT, TAB_TOP_GAP,
 };
 use crate::theme::{Palette, PaletteExt as _, TerminalColors as _};
 
@@ -995,8 +995,9 @@ impl AppView {
                             div()
                                 .absolute()
                                 .top_0()
-                                .left(px(TAB_RADIUS))
-                                .right(px(TAB_RADIUS))
+                                // Half the tab, centered over the title (A8).
+                                .left(relative(TAB_ACCENT_INSET))
+                                .right(relative(TAB_ACCENT_INSET))
                                 .h(px(TAB_ACCENT_HEIGHT))
                                 .rounded_b(px(TAB_ACCENT_HEIGHT))
                                 .bg(palette.accent),
