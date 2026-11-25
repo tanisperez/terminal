@@ -1,4 +1,4 @@
-# The agent usage screen (design H2).
+# The agent usage screen (designs H3 to H5).
 _version: 2
 "usage.open":
   en: "Agent usage"
@@ -33,9 +33,6 @@ _version: 2
 "usage.empty_description":
   en: "The usage of Claude Code shows here once it has run on this computer (~/.claude/projects)."
   es: "El uso de Claude Code aparece aquí cuando se haya usado en este equipo (~/.claude/projects)."
-"usage.now":
-  en: "Now"
-  es: "Ahora"
 "usage.open_sessions.one":
   en: "%{count} open session"
   es: "%{count} sesión abierta"
@@ -51,45 +48,12 @@ _version: 2
 "usage.waiting":
   en: "Waiting"
   es: "En espera"
-"usage.input":
-  en: "Input"
-  es: "Entrada"
 "usage.output":
   en: "Output"
   es: "Salida"
 "usage.tasks":
   en: "Tasks"
   es: "Tareas"
-"usage.time":
-  en: "Time"
-  es: "Tiempo"
-"usage.input_detail":
-  en: "%{fresh} fresh · %{writes} cache writes · %{reads} cache reads"
-  es: "%{fresh} nuevos · %{writes} escritos en caché · %{reads} leídos de caché"
-"usage.per_day":
-  en: "Tokens per day"
-  es: "Tokens por día"
-"usage.days_detail":
-  en: "%{active} of %{days} days with agents · %{per_day}/day"
-  es: "%{active} de %{days} días con agentes · %{per_day}/día"
-"usage.input_lower":
-  en: "input"
-  es: "entrada"
-"usage.output_lower":
-  en: "output"
-  es: "salida"
-"usage.models":
-  en: "Models"
-  es: "Modelos"
-"usage.models_detail":
-  en: "input tokens"
-  es: "tokens de entrada"
-"usage.more_models.one":
-  en: "%{count} more"
-  es: "%{count} más"
-"usage.more_models.other":
-  en: "%{count} more"
-  es: "%{count} más"
 "usage.month.1":
   en: "Jan"
   es: "ene"
@@ -126,3 +90,249 @@ _version: 2
 "usage.month.12":
   en: "Dec"
   es: "dic"
+"usage.section.spend":
+  en: "Spend"
+  es: "Consumo"
+"usage.section.projects":
+  en: "Projects"
+  es: "Proyectos"
+"usage.section.habits":
+  en: "Habits"
+  es: "Hábitos"
+"usage.tokens":
+  en: "Tokens"
+  es: "Tokens"
+"usage.tokens_note":
+  en: "%{input} input · %{output} output"
+  es: "%{input} entrada · %{output} salida"
+"usage.cost":
+  en: "API cost"
+  es: "Coste API"
+"usage.cost_note":
+  en: "estimated at API prices"
+  es: "estimado a precios de la API"
+"usage.cost_note_change":
+  en: "estimated · %{change}% vs before"
+  es: "estimado · %{change} % vs. anterior"
+"usage.cache":
+  en: "Cache"
+  es: "Caché"
+"usage.cache_note":
+  en: "of the input comes from the cache"
+  es: "de la entrada sale de la caché"
+"usage.per_task":
+  en: "%{tokens} tokens/task"
+  es: "%{tokens} tokens/tarea"
+"usage.block":
+  en: "5-hour block"
+  es: "Bloque de 5 h"
+"usage.no_block":
+  en: "No block running: the next message starts one."
+  es: "Ningún bloque en curso: el próximo mensaje empieza uno."
+"usage.block_ends":
+  en: "renews in %{time}"
+  es: "se renueva en %{time}"
+"usage.block_share":
+  en: "tokens · %{share}% of your largest block"
+  es: "tokens · %{share} % de tu bloque mayor"
+"usage.block_rate":
+  en: "%{rate}/min now"
+  es: "%{rate}/min ahora"
+"usage.block_projected":
+  en: "at this pace: %{share}% at the end"
+  es: "a este ritmo: %{share} % al cerrar"
+"usage.open_context":
+  en: "Open sessions · context"
+  es: "Sesiones abiertas · contexto"
+"usage.context_of":
+  en: "%{used} of %{limit} of context"
+  es: "%{used} de %{limit} de contexto"
+"usage.compacts_soon":
+  en: "compacts soon"
+  es: "compactará pronto"
+"usage.context_note":
+  en: "The context is the input of the session's last message: what the model reads on each turn. Near the limit, Claude Code compacts it."
+  es: "El contexto es la entrada del último mensaje de la sesión: lo que el modelo lee en cada turno. Cerca del límite, Claude Code lo compacta."
+"usage.cost_chart":
+  en: "Cost so far against the period before"
+  es: "Coste acumulado frente al periodo anterior"
+"usage.this_period":
+  en: "This period"
+  es: "Este periodo"
+"usage.previous_period":
+  en: "Before"
+  es: "Anterior"
+"usage.before":
+  en: "before"
+  es: "antes"
+"usage.mix_chart":
+  en: "Where the tokens come from, by day"
+  es: "De dónde salen los tokens, por día"
+"usage.cache_read":
+  en: "Cache read"
+  es: "Caché leída"
+"usage.cache_write":
+  en: "Cache written"
+  es: "Caché escrita"
+"usage.fresh_input":
+  en: "New input"
+  es: "Entrada nueva"
+"usage.projects":
+  en: "Projects"
+  es: "Proyectos"
+"usage.projects_detail":
+  en: "by working folder · by cost"
+  es: "por carpeta de trabajo · por coste"
+"usage.recent_sessions":
+  en: "Recent sessions"
+  es: "Sesiones recientes"
+"usage.recent_sessions_detail":
+  en: "one per Claude Code conversation"
+  es: "una por conversación de Claude Code"
+"usage.col.project":
+  en: "Project"
+  es: "Proyecto"
+"usage.col.share":
+  en: "Share of the cost"
+  es: "Parte del coste"
+"usage.col.cost":
+  en: "Cost"
+  es: "Coste"
+"usage.col.tokens":
+  en: "Tokens"
+  es: "Tokens"
+"usage.col.tasks":
+  en: "Tasks"
+  es: "Tareas"
+"usage.col.time":
+  en: "Time"
+  es: "Tiempo"
+"usage.col.per_day":
+  en: "Tokens per day"
+  es: "Tokens por día"
+"usage.col.last":
+  en: "Last used"
+  es: "Último uso"
+"usage.col.started":
+  en: "Started"
+  es: "Empezó"
+"usage.col.model":
+  en: "Model"
+  es: "Modelo"
+"usage.col.duration":
+  en: "Duration"
+  es: "Duración"
+"usage.col.context":
+  en: "Peak context"
+  es: "Pico de contexto"
+"usage.compactions.one":
+  en: "compacted once"
+  es: "compactó una vez"
+"usage.compactions.other":
+  en: "compacted %{count} times"
+  es: "compactó %{count} veces"
+"usage.active_days":
+  en: "Active days"
+  es: "Días activos"
+"usage.days_of":
+  en: "%{active} of %{days}"
+  es: "%{active} de %{days}"
+"usage.longest_streak":
+  en: "longest streak: %{days} days"
+  es: "racha más larga: %{days} días"
+"usage.peak_hours":
+  en: "Peak hours"
+  es: "Hora punta"
+"usage.peak_note":
+  en: "%{share}% of the tasks"
+  es: "%{share} % de las tareas"
+"usage.mean_task":
+  en: "Average task"
+  es: "Tarea media"
+"usage.mean_task_note":
+  en: "from the prompt to the last answer"
+  es: "del prompt a la última respuesta"
+"usage.weekends":
+  en: "Weekends"
+  es: "Fines de semana"
+"usage.weekends_note":
+  en: "of the tokens"
+  es: "de los tokens"
+"usage.when":
+  en: "When the agents work"
+  es: "Cuándo trabajan los agentes"
+"usage.when_detail":
+  en: "tasks by hour and weekday"
+  es: "tareas por hora y día de la semana"
+"usage.tasks_count.one":
+  en: "%{count} task"
+  es: "%{count} tarea"
+"usage.tasks_count.other":
+  en: "%{count} tasks"
+  es: "%{count} tareas"
+"usage.less":
+  en: "less"
+  es: "menos"
+"usage.more":
+  en: "more"
+  es: "más"
+"usage.days_with_agents":
+  en: "Days with agents"
+  es: "Días con agentes"
+"usage.streak":
+  en: "current streak: %{days} days"
+  es: "racha actual: %{days} días"
+"usage.no_agents":
+  en: "no agents"
+  es: "sin agentes"
+"usage.models_by_week":
+  en: "Models by week"
+  es: "Modelos por semana"
+"usage.other_models":
+  en: "Others"
+  es: "Otros"
+"usage.week_of":
+  en: "Week of %{date}"
+  es: "Semana del %{date}"
+"usage.this_week":
+  en: "this week"
+  es: "esta semana"
+"usage.no_folder":
+  en: "No folder"
+  es: "Sin carpeta"
+"usage.ago.now":
+  en: "now"
+  es: "ahora"
+"usage.ago.minutes":
+  en: "%{count} min ago"
+  es: "hace %{count} min"
+"usage.ago.hours":
+  en: "%{count} h ago"
+  es: "hace %{count} h"
+"usage.ago.yesterday":
+  en: "yesterday"
+  es: "ayer"
+"usage.ago.days":
+  en: "%{count} days ago"
+  es: "hace %{count} días"
+"usage.weekday.0":
+  en: "Mon"
+  es: "lun"
+"usage.weekday.1":
+  en: "Tue"
+  es: "mar"
+"usage.weekday.2":
+  en: "Wed"
+  es: "mié"
+"usage.weekday.3":
+  en: "Thu"
+  es: "jue"
+"usage.weekday.4":
+  en: "Fri"
+  es: "vie"
+"usage.weekday.5":
+  en: "Sat"
+  es: "sáb"
+"usage.weekday.6":
+  en: "Sun"
+  es: "dom"

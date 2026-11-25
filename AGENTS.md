@@ -74,7 +74,12 @@ Expo/React Native conventions here.
   startup.
 - Agent usage (#6, decided on 2026-11-23) comes from Claude Code only, for now: the `usage` of
   each assistant message in `~/.claude/projects/*/*.jsonl`, read in the background when the
-  screen opens. Only the usage lines are read, never the content. Input tokens include the cache
+  screen opens. Since 0.3.0 the screen has three sections (designs H3 to H5): Spend
+  (the 5-hour block against the largest one, the context of the open sessions, the cost at API
+  prices against the period before, where the tokens come from), Projects (by `cwd`, and the
+  latest sessions with their peak context) and Habits (prompts by weekday and hour, the days
+  with agents, the models by week). Prices are in `tterm-usage/src/insights.rs`; a new model
+  needs a row there. Only the usage lines are read, never the content. Input tokens include the cache
   (creation and reads), with the breakdown in the tooltip. Open sessions are the tabs running
   `claude`.
 - Packaging and updates (#11, decided on 2026-11-23): copied from ted (`docs/releasing.md`).
@@ -123,8 +128,10 @@ tterm-app ──> tterm-term ──> ghostty-vt, portable-pty
   (lines of styled runs, background spans, the cursor, the scroll position) and encodes keys,
   pastes and focus reports. No gpui, tested with `cargo test`.
 - `tterm-usage`: the token usage of the agents, read from Claude Code's logs
-  (`~/.claude/projects/**/*.jsonl`, one entry per message id, prompts as tasks) and summed per
-  period and local day for the usage screen. Only usage numbers, never message contents. No gpui.
+  (`~/.claude/projects/**/*.jsonl`, one entry per message id, prompts as tasks, the folder from
+  `cwd`) and summed per period and local day for the usage screen; `insights` adds the cost at
+  API prices, the 5-hour block, projects, sessions and habits (designs H3 to H5). Only usage
+  numbers, never message contents. No gpui.
   `cargo run --release -p tterm-usage --example scan` prints the totals of this machine.
 - `tterm-cli`: `-h/--help`, `-V/--version` and the folder arguments, `IDENTITY` (the
   `telaio_app::AppIdentity` of tterm), `build.rs` with the commit, as `ted-cli`.

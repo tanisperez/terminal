@@ -69,6 +69,8 @@ struct Line {
     session: Option<String>,
     #[serde(rename = "isMeta", default)]
     meta: bool,
+    /// The folder the agent works in: which project the session belongs to.
+    cwd: Option<String>,
     message: Option<LineMessage>,
 }
 
@@ -120,6 +122,11 @@ fn read_line(line: &str, usage: &mut FileUsage, seen: &mut HashSet<String>) {
         return;
     };
     let session = parsed.session.unwrap_or_default();
+    if usage.cwd.is_none()
+        && let Some(cwd) = parsed.cwd.as_deref().filter(|cwd| !cwd.is_empty())
+    {
+        usage.cwd = Some(PathBuf::from(cwd));
+    }
     let Some(message) = parsed.message else {
         return;
     };
@@ -166,7 +173,7 @@ mod tests {
     use pretty_assertions::assert_eq;
     use std::io::Write;
 
-    const LOG: &str = r#"{"type":"user","timestamp":"2026-11-20T10:00:00.000Z","sessionId":"s1","message":{"role":"user","content":"secret prompt"}}
+    const LOG: &str = r#"{"type":"user","timestamp":"2026-11-20T10:00:00.000Z","sessionId":"s1","cwd":"/home/me/dev/app","message":{"role":"user","content":"secret prompt"}}
 {"type":"assistant","timestamp":"2026-11-20T10:00:05.000Z","sessionId":"s1","message":{"id":"m1","model":"claude-opus-5-5","content":[{"type":"text","text":"hi"}],"usage":{"input_tokens":2,"cache_creation_input_tokens":100,"cache_read_input_tokens":1000,"output_tokens":50}}}
 {"type":"assistant","timestamp":"2026-11-20T10:00:06.000Z","sessionId":"s1","message":{"id":"m1","model":"claude-opus-5-5","content":[],"usage":{"input_tokens":2,"cache_creation_input_tokens":100,"cache_read_input_tokens":1000,"output_tokens":50}}}
 {"type":"user","timestamp":"2026-11-20T10:00:07.000Z","sessionId":"s1","message":{"role":"user","content":[{"type":"tool_result","content":"x"}]}}
@@ -192,6 +199,7 @@ not json
         assert_eq!(first.output, 50);
         assert_eq!(first.session, "s1");
         assert_eq!(usage.prompts.len(), 1);
+        assert_eq!(usage.cwd, Some(PathBuf::from("/home/me/dev/app")));
     }
 
     #[test]

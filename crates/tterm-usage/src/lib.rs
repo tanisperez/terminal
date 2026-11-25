@@ -6,6 +6,7 @@
 //! the cache writes and reads, as the agent pays for all of them.
 
 pub mod claude;
+pub mod insights;
 
 use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
@@ -13,7 +14,7 @@ use std::path::{Path, PathBuf};
 use chrono::{DateTime, Duration, FixedOffset, NaiveDate, Utc};
 
 /// The longest pause between two events of a session that still counts as working time.
-const ACTIVE_GAP: Duration = Duration::minutes(5);
+pub(crate) const ACTIVE_GAP: Duration = Duration::minutes(5);
 /// How many models the breakdown names; the rest are summed.
 pub const NAMED_MODELS: usize = 4;
 
@@ -63,6 +64,8 @@ pub struct FileUsage {
     pub messages: Vec<Message>,
     /// The typed prompts.
     pub prompts: Vec<Prompt>,
+    /// The folder the agent worked in, from the log's first entry that names it.
+    pub cwd: Option<PathBuf>,
 }
 
 /// The folders of Claude Code's logs: the user's own (`~/.claude/projects`), then those found in
@@ -98,7 +101,7 @@ pub fn read_claude_code(dirs: &[PathBuf]) -> Vec<FileUsage> {
 }
 
 /// A session of an agent running in a tab, from its log.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Session {
     /// The model of its last answer, as shown.
     pub model: Option<String>,
@@ -108,6 +111,12 @@ pub struct Session {
     pub duration: Duration,
     /// Whether the log was written in the last few seconds: the agent is working.
     pub working: bool,
+    /// The context of its last answer: the input the model read.
+    pub context: u64,
+    /// The context window it runs with.
+    pub context_limit: u64,
+    /// What it would cost through the API, in dollars.
+    pub cost: f64,
 }
 
 /// How recent a write must be for a session to count as working.
@@ -145,6 +154,11 @@ pub fn latest_session(
         model: file.messages.last().map(|m| model_name(&m.model)),
         tokens: file.messages.iter().map(|m| m.input() + m.output).sum(),
         duration: last - first,
+        context: file.messages.last().map(Message::input).unwrap_or(0),
+        context_limit: insights::context_limit(
+            file.messages.iter().map(Message::input).max().unwrap_or(0),
+        ),
+        cost: file.messages.iter().map(insights::cost).sum(),
         working: file
             .modified
             .and_then(|modified| now.duration_since(modified).ok())
@@ -170,7 +184,7 @@ impl Period {
     /// Every period, in the order of the segmented control.
     pub const ALL: [Period; 4] = [Period::Days7, Period::Days30, Period::Days90, Period::All];
 
-    fn days(self) -> Option<i64> {
+    pub(crate) fn days(self) -> Option<i64> {
         match self {
             Period::Days7 => Some(7),
             Period::Days30 => Some(30),
@@ -492,6 +506,7 @@ mod tests {
                     session: "c".to_string(),
                 },
             ],
+            cwd: None,
         }]
     }
 
