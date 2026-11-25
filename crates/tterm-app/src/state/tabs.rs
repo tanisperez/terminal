@@ -211,6 +211,58 @@ fn percent_decode(text: &str) -> String {
     String::from_utf8_lossy(&out).into_owned()
 }
 
+/// How much of the visible width an arrow of the tab strip scrolls, so the last tab seen stays
+/// in view.
+const PAGE_FRACTION: f32 = 0.9;
+/// Layout values closer than this (in pixels) are the same, to ignore rounding noise.
+const EPSILON: f32 = 0.5;
+
+/// What the tab strip shows besides the tabs when they do not fit (as telaio's `DocumentTabs`,
+/// in Postino and ted): the arrows and the list of tabs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct StripFlags {
+    /// The arrows and the list button are visible: the tabs overflow.
+    pub show_controls: bool,
+    /// The left arrow scrolls.
+    pub can_scroll_left: bool,
+    /// The right arrow scrolls.
+    pub can_scroll_right: bool,
+}
+
+impl StripFlags {
+    /// The flags for a strip `viewport` wide, scrolled by `offset` (zero or negative), that can
+    /// scroll `max` pixels, while the controls (`controls` wide) `were_shown`. The controls take
+    /// room from the strip, so the test is against the room the tabs have without them; testing
+    /// the visible width instead would flip the controls on and off for tabs that fit only
+    /// without them.
+    pub fn new(offset: f32, max: f32, viewport: f32, controls: f32, were_shown: bool) -> Self {
+        let content = viewport + max;
+        let room = if were_shown {
+            viewport + controls
+        } else {
+            viewport
+        };
+        let show_controls = content > room + EPSILON;
+        Self {
+            show_controls,
+            can_scroll_left: show_controls && offset < -EPSILON,
+            can_scroll_right: show_controls && -offset < max - EPSILON,
+        }
+    }
+}
+
+/// The scroll offset after an arrow click: one page (about the visible width) towards `forward`
+/// or back, clamped to the scrollable range. Offsets are zero or negative.
+pub fn paged_offset(offset: f32, max: f32, viewport: f32, forward: bool) -> f32 {
+    let page = viewport * PAGE_FRACTION;
+    let target = if forward {
+        offset - page
+    } else {
+        offset + page
+    };
+    target.clamp(-max.max(0.0), 0.0)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -352,5 +404,38 @@ mod tests {
             pwd_path("kitty-shell-cwd://thinkpad/home/me/dev/my%20dir"),
             Path::new("/home/me/dev/my%20dir")
         );
+    }
+
+    #[test]
+    fn tabs_that_fit_show_no_controls() {
+        assert_eq!(
+            StripFlags::new(0.0, 0.0, 600.0, 90.0, false),
+            StripFlags::default()
+        );
+    }
+
+    #[test]
+    fn the_arrows_follow_the_offset() {
+        let start = StripFlags::new(0.0, 300.0, 500.0, 90.0, true);
+        assert!(start.show_controls && !start.can_scroll_left && start.can_scroll_right);
+        let middle = StripFlags::new(-150.0, 300.0, 500.0, 90.0, true);
+        assert!(middle.can_scroll_left && middle.can_scroll_right);
+        let end = StripFlags::new(-300.0, 300.0, 500.0, 90.0, true);
+        assert!(end.can_scroll_left && !end.can_scroll_right);
+    }
+
+    #[test]
+    fn tabs_that_fit_only_without_the_controls_do_not_flip_them() {
+        // 560 px of tabs: with the controls shown the strip is 500 px and scrolls 60, but
+        // without them it would be 590 px and fit.
+        assert!(!StripFlags::new(0.0, 60.0, 500.0, 90.0, true).show_controls);
+        assert!(StripFlags::new(0.0, 100.0, 500.0, 90.0, true).show_controls);
+    }
+
+    #[test]
+    fn a_page_is_about_the_visible_width_and_stops_at_both_ends() {
+        assert_eq!(paged_offset(0.0, 1000.0, 400.0, true), -360.0);
+        assert_eq!(paged_offset(-900.0, 1000.0, 400.0, true), -1000.0);
+        assert_eq!(paged_offset(-100.0, 1000.0, 400.0, false), 0.0);
     }
 }

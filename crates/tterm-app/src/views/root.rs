@@ -7,12 +7,14 @@
 use std::path::PathBuf;
 
 use gpui_kit::assets::IconName;
-use gpui_kit::component::menu::{ContextMenuExt as _, PopupMenu, PopupMenuItem};
+use gpui_kit::component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::menu::{ContextMenuExt as _, DropdownMenu as _, PopupMenu, PopupMenuItem};
 use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::*;
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 use rust_i18n::t;
+use telaio_ui::components::OpenOnClickExt as _;
 use telaio_ui::components::{CloseScope, TabMenuTarget, close_item};
 
 use crate::actions::{
@@ -23,7 +25,7 @@ use crate::state::profiles::{self, Profile, Profiles};
 use crate::state::settings::{
     FONT_SIZE_STEP, Settings, ThemeChoice, clamp_font_size, save_settings,
 };
-use crate::state::tabs::Tabs;
+use crate::state::tabs::{StripFlags, Tabs, paged_offset};
 use crate::theme::metrics::{
     BAR_BUTTON_SIZE, BAR_BUTTON_TOP, RADIUS_SM, TAB_ACCENT_HEIGHT, TAB_ACCENT_INSET,
     TAB_BAR_HEIGHT, TAB_CLOSE_SIZE, TAB_HEIGHT, TAB_ICON_SIZE, TAB_MAX_WIDTH, TAB_MIN_WIDTH,
@@ -70,6 +72,14 @@ pub struct AppView {
     tab_drag_outside: Option<usize>,
     /// The subscription to each tab's events, dropped when the tab closes or moves away.
     terminal_subscriptions: Vec<(EntityId, Subscription)>,
+    /// The horizontal scroll of the tab strip, when the tabs do not fit.
+    tab_scroll: ScrollHandle,
+    /// What the last render of the strip drew: its arrows and list button, or not.
+    tab_strip: StripFlags,
+    /// The active tab at the last render, to scroll to it only when it changes.
+    tab_scrolled_to: Option<usize>,
+    /// Frames left to check that the active tab is fully in view, see [`REVEAL_FRAMES`].
+    tab_reveal_frames: u8,
 }
 
 /// A tab: its panes and the one with the focus, which names the tab (#33, design S1).
@@ -114,6 +124,44 @@ const SEPARATOR_GRAB: f32 = 6.0;
 /// How far the line under the bar reaches past the row of tabs at each side: past the window
 /// controls of Windows and the traffic lights of macOS.
 const BAR_LINE_REACH: f32 = 240.0;
+/// Space between two tabs.
+const TAB_GAP: f32 = 2.0;
+/// How much faster the tab strip takes free room than the spacer after the buttons, so the
+/// spacer only gets what the tabs do not want.
+const STRIP_GROW: f32 = 10_000.0;
+/// Width of the arrows and the list button the tab strip shows when the tabs do not fit.
+const STRIP_CONTROLS_WIDTH: f32 = 3.0 * BAR_BUTTON_SIZE + 2.0 * 2.0 + 8.0;
+/// The most the list of tabs grows, in pixels, before it scrolls.
+const TAB_LIST_MAX_HEIGHT: f32 = 360.0;
+/// How many frames after the active tab changes the strip checks that it is fully in view.
+/// gpui scrolls to an item with the sizes of the frame before, so a tab scrolled into view
+/// right when the arrows appear (and narrow the strip) ends up cut by them, as in telaio's
+/// `DocumentTabs`.
+const REVEAL_FRAMES: u8 = 3;
+
+/// The flags of the tab strip that `handle` shows now.
+fn measure_strip(handle: &ScrollHandle, were_shown: bool) -> StripFlags {
+    StripFlags::new(
+        handle.offset().x.into(),
+        handle.max_offset().x.into(),
+        handle.bounds().size.width.into(),
+        STRIP_CONTROLS_WIDTH,
+        were_shown,
+    )
+}
+
+/// Whether the tab at `index` fits the strip but is partly out of view.
+fn is_cut(handle: &ScrollHandle, index: usize) -> bool {
+    let Some(tab) = handle.bounds_for_item(index) else {
+        return false;
+    };
+    let viewport = handle.bounds();
+    let offset = handle.offset().x;
+    let epsilon = px(0.5);
+    tab.size.width <= viewport.size.width
+        && (tab.left() + offset < viewport.left() - epsilon
+            || tab.right() + offset > viewport.right() + epsilon)
+}
 
 impl AppView {
     /// The window with one tab per folder of `dirs`, or one in the home folder.
@@ -145,6 +193,10 @@ impl AppView {
             _subscriptions: Vec::new(),
             terminal_subscriptions: Vec::new(),
             tab_drag_outside: None,
+            tab_scroll: ScrollHandle::new(),
+            tab_strip: StripFlags::default(),
+            tab_scrolled_to: None,
+            tab_reveal_frames: 0,
         };
         view.rebuild_profiles();
         match first {
@@ -837,7 +889,18 @@ impl AppView {
         self.settings.theme == ThemeChoice::System
     }
 
-    fn render_bar(&self, palette: &Palette, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render_bar(&mut self, palette: &Palette, cx: &mut Context<Self>) -> impl IntoElement {
+        // When the tabs do not fit, the strip scrolls and shows arrows and a list of the tabs,
+        // as telaio's `DocumentTabs` in Postino and ted. A new active tab is scrolled into view.
+        let active_index = self.tabs.active_index();
+        if self.tab_scrolled_to != Some(active_index) {
+            self.tab_scroll.scroll_to_item(active_index);
+            self.tab_reveal_frames = REVEAL_FRAMES;
+            self.tab_scrolled_to = Some(active_index);
+        }
+        self.tab_strip = measure_strip(&self.tab_scroll, self.tab_strip.show_controls);
+        let flags = self.tab_strip;
+        let handle = self.tab_scroll.clone();
         let opacity = crate::theme::palette::background_opacity(cx);
         let (bar_bg, border) = (
             palette.tab_bar_bg().opacity(opacity),
@@ -856,19 +919,22 @@ impl AppView {
                 .h(px(1.0))
                 .bg(border),
         );
-        // Tabs shrink to their minimum; past it the strip clips them and the buttons of the
+        // Tabs shrink to their minimum; past it the strip scrolls (the wheel too: gpui turns it
+        // into a horizontal scroll on a row that only scrolls across) and the buttons of the
         // bar stay in place.
+        let count = self.tabs.iter().count() as f32;
+        let natural_width =
+            TAB_STRIP_LEFT + count * TAB_MAX_WIDTH + (count - 1.0).max(0.0) * TAB_GAP;
         let mut strip = h_flex()
             .id("tab-strip")
             .items_start()
             .pt(px(TAB_TOP_GAP))
             .pl(px(TAB_STRIP_LEFT))
-            .gap(px(2.0))
-            .min_w_0()
-            .flex_shrink(1.0)
+            .gap(px(TAB_GAP))
             // One pixel below the bar, for the active tab to cover the line (below).
             .h(px(TAB_BAR_HEIGHT + 1.0))
-            .overflow_hidden()
+            .overflow_x_scroll()
+            .track_scroll(&handle)
             // Dropped on the bar past the last tab: the tab moves to the end.
             .on_drop(cx.listener(|view, dragged: &DraggedTab, _, cx| {
                 view.move_tab(dragged.index, usize::MAX, cx)
@@ -877,11 +943,33 @@ impl AppView {
             let active = index == self.tabs.active_index();
             let label = tab.focused.read(cx).label();
             let hover = tab.focused.read(cx).hover_info();
-            strip = strip.child(no_drag(
-                self.render_tab(index, label, hover, active, palette, cx),
-            ));
+            strip = strip.child(self.render_tab(index, label, hover, active, palette, cx));
         }
-        row = row.child(strip).child(no_drag(
+        // Sized by the row, never by its tabs: as wide as the tabs want while they fit
+        // (`max_w`), else whatever the buttons leave. A width from the tabs would make the bar,
+        // which `TitleBar` never shrinks, push the buttons out of the window. The whole strip
+        // takes the mouse (see `no_drag`), not each tab: an occluding tab would hide the strip
+        // under it from the wheel.
+        let strip = div()
+            .occlude()
+            .w_0()
+            .min_w_0()
+            .max_w(px(natural_width))
+            .flex_grow(STRIP_GROW)
+            .child(strip.w_full());
+        row = row.child(strip);
+        if flags.show_controls {
+            // The last visible tab is cut: a line keeps it apart from the button.
+            row = row.child(
+                div()
+                    .flex_none()
+                    .w(px(1.0))
+                    .h(px(BAR_BUTTON_SIZE - 10.0))
+                    .mt(px(BAR_BUTTON_TOP + 5.0))
+                    .bg(border),
+            );
+        }
+        row = row.child(no_drag(
             bar_button("new-tab", IconName::Plus, palette)
                 .ml(px(4.0))
                 .mt(px(BAR_BUTTON_TOP))
@@ -898,6 +986,41 @@ impl AppView {
             )));
         }
         row = row.child(div().flex_1());
+        if flags.show_controls {
+            row = row.child(self.render_strip_controls(flags, &handle, palette, cx));
+        }
+        // Checks after paint that the layout still matches what this render drew, and that the
+        // active tab is not cut by the arrows that just appeared; one more frame only then.
+        let weak = cx.weak_entity();
+        row = row.child(
+            canvas(|_, _, _| {}, {
+                let handle = handle.clone();
+                move |_, _, window, cx| {
+                    let refresh = weak
+                        .update(cx, |view, _| {
+                            let drawn = view.tab_strip;
+                            let settled = measure_strip(&handle, drawn.show_controls) == drawn;
+                            let mut refresh = !settled;
+                            if view.tab_reveal_frames > 0 {
+                                if is_cut(&handle, active_index) {
+                                    handle.scroll_to_item(active_index);
+                                    view.tab_reveal_frames -= 1;
+                                    refresh = true;
+                                } else if settled {
+                                    view.tab_reveal_frames = 0;
+                                }
+                            }
+                            refresh
+                        })
+                        .unwrap_or(false);
+                    if refresh {
+                        window.defer(cx, |window, _| window.refresh());
+                    }
+                }
+            })
+            .absolute()
+            .size_0(),
+        );
         if let Some(update) = self.render_update_button(palette, cx) {
             row = row.child(no_drag(
                 div().mt(px(BAR_BUTTON_TOP)).mr(px(6.0)).child(update),
@@ -934,6 +1057,92 @@ impl AppView {
             .bg(bar_bg)
             .border_b_0()
             .child(row)
+    }
+
+    /// The arrows that scroll the tab strip a page and the list of every tab, shown while the
+    /// tabs do not fit.
+    fn render_strip_controls(
+        &self,
+        flags: StripFlags,
+        handle: &ScrollHandle,
+        palette: &Palette,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
+        let page = |forward: bool| {
+            let handle = handle.clone();
+            move |_: &ClickEvent, window: &mut Window, _: &mut App| {
+                let offset = handle.offset();
+                let x = paged_offset(
+                    offset.x.into(),
+                    handle.max_offset().x.into(),
+                    handle.bounds().size.width.into(),
+                    forward,
+                );
+                handle.set_offset(point(px(x), offset.y));
+                // The arrows' enabled state is drawn from the new offset.
+                window.refresh();
+            }
+        };
+        let arrow = |id: &'static str, icon: IconName, tip: String, enabled: bool| {
+            bar_button(id, icon, palette)
+                .mt(px(BAR_BUTTON_TOP))
+                .tooltip(move |window, cx| {
+                    Tooltip::new(SharedString::from(tip.clone())).build(window, cx)
+                })
+                .when(!enabled, |button| button.opacity(0.35).cursor_default())
+        };
+        let entries: Vec<(usize, String)> = self
+            .tabs
+            .iter()
+            .enumerate()
+            .map(|(index, tab)| (index, tab.focused.read(cx).label()))
+            .collect();
+        let active = self.tabs.active_index();
+        let weak = cx.weak_entity();
+        let list = Button::new("tab-list")
+            .ghost()
+            .size(px(BAR_BUTTON_SIZE))
+            .rounded(px(RADIUS_SM))
+            .text_color(palette.fg_muted)
+            .icon(Icon::new(IconName::ChevronsUpDown).with_size(px(14.0)))
+            .tooltip(t!("tabs.list"))
+            .open_on_click()
+            .dropdown_menu(move |menu: PopupMenu, _, _| {
+                let mut menu = menu.scrollable(true).max_h(px(TAB_LIST_MAX_HEIGHT));
+                for (index, label) in entries.clone() {
+                    let weak = weak.clone();
+                    menu = menu.item(PopupMenuItem::new(label).checked(index == active).on_click(
+                        move |_, window, cx| {
+                            let _ = weak.update(cx, |view, cx| view.activate(index, window, cx));
+                        },
+                    ));
+                }
+                menu
+            });
+        h_flex()
+            .flex_none()
+            .w(px(STRIP_CONTROLS_WIDTH))
+            .items_start()
+            .gap(px(2.0))
+            .child(no_drag(
+                arrow(
+                    "tabs-previous",
+                    IconName::ChevronLeft,
+                    t!("tabs.previous").into_owned(),
+                    flags.can_scroll_left,
+                )
+                .when(flags.can_scroll_left, |button| button.on_click(page(false))),
+            ))
+            .child(no_drag(
+                arrow(
+                    "tabs-next",
+                    IconName::ChevronRight,
+                    t!("tabs.next").into_owned(),
+                    flags.can_scroll_right,
+                )
+                .when(flags.can_scroll_right, |button| button.on_click(page(true))),
+            ))
+            .child(no_drag(div().mt(px(BAR_BUTTON_TOP)).child(list)))
     }
 
     fn render_tab(

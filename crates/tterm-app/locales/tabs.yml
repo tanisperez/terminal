@@ -9,3 +9,12 @@ _version: 2
 "tabs.move_to_new_window":
   en: "Move to New Window"
   es: "Mover a una ventana nueva"
+"tabs.previous":
+  en: "Scroll the tabs left"
+  es: "Desplazar las pestañas a la izquierda"
+"tabs.next":
+  en: "Scroll the tabs right"
+  es: "Desplazar las pestañas a la derecha"
+"tabs.list":
+  en: "Every tab"
+  es: "Todas las pestañas"
