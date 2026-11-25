@@ -18,7 +18,7 @@ pub const TAB_RADIUS: f32 = 8.0;
 /// Space above the buttons of the bar, centering them on the tabs.
 pub const BAR_BUTTON_TOP: f32 = TAB_TOP_GAP + (TAB_HEIGHT - BAR_BUTTON_SIZE) / 2.0;
 /// Widest a tab gets; tabs shrink when they do not fit.
-pub const TAB_MAX_WIDTH: f32 = 168.0;
+pub const TAB_MAX_WIDTH: f32 = 200.0;
 /// Narrowest a tab gets.
 pub const TAB_MIN_WIDTH: f32 = 72.0;
 /// Height of the accent line on top of the active tab.
