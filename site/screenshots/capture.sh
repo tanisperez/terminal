@@ -163,8 +163,8 @@ step_hero() {
 step_profiles() {
     settings "$1"
     launch -- "$HOME_DIR/dev/terminal" "$HOME_DIR/dev/postino"
-    # The chevron after the + button, with two tabs, in screenshot pixels.
-    click 618 65
+    # The chevron after the + button, with two tabs of 200 px, in screenshot pixels.
+    click 715 65
     shot profiles "$1" keep
     quit_app
 }
