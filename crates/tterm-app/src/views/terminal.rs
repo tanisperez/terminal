@@ -195,16 +195,47 @@ impl TerminalView {
             Err(error) => panic!("could not create the terminal: {error}"),
         };
         let cwd = profile.and_then(|profile| profile.cwd.clone()).or(cwd);
+        let shell_kind = crate::state::shell::ShellKind::of(
+            profile
+                .map(|profile| profile.command.as_slice())
+                .unwrap_or(&[]),
+        );
+        let mut command: Vec<std::ffi::OsString> = profile
+            .map(|profile| profile.command.iter().map(Into::into).collect())
+            .unwrap_or_default();
+        let mut spawn_cwd = cwd.clone();
+        match shell_kind {
+            // WSL starts in a folder of the distribution, given to `wsl.exe`, and runs the
+            // shell integration there, so the folder is known for the next tab.
+            crate::state::shell::ShellKind::Wsl => {
+                let in_wsl =
+                    |path: &std::path::Path| crate::state::shell::wsl_path(&path.to_string_lossy());
+                let launcher = tterm_term::integration::wsl_launcher()
+                    .inspect_err(|error| log::warn!("no shell integration in WSL: {error}"))
+                    .ok();
+                command = tterm_term::integration::wsl(
+                    &command,
+                    cwd.as_deref().map(in_wsl).as_deref(),
+                    launcher.as_deref().map(in_wsl).as_deref(),
+                );
+                spawn_cwd = None;
+            }
+            // A folder of a WSL tab under `/mnt/<drive>` is a Windows folder too.
+            crate::state::shell::ShellKind::Windows => {
+                spawn_cwd = cwd.as_deref().map(|path| {
+                    PathBuf::from(crate::state::shell::windows_path(&path.to_string_lossy()))
+                });
+            }
+            crate::state::shell::ShellKind::Posix => {}
+        }
         // Ghostty's shell integration: the shell reports its folder and its prompts (#10).
         let launch = tterm_term::integration::for_this_system(tterm_term::integration::Launch {
-            command: profile
-                .map(|profile| profile.command.iter().map(Into::into).collect())
-                .unwrap_or_default(),
+            command,
             env: pty::terminal_env(tterm_cli::IDENTITY.version),
         });
         let options = SpawnOptions {
             command: launch.command,
-            cwd: cwd.clone(),
+            cwd: spawn_cwd,
             env: launch.env,
             cols: size.cols,
             rows: size.rows,
@@ -235,11 +266,7 @@ impl TerminalView {
             cwd,
             scroll_rest: 0.0,
             drop_preview: None,
-            shell_kind: crate::state::shell::ShellKind::of(
-                profile
-                    .map(|profile| profile.command.as_slice())
-                    .unwrap_or(&[]),
-            ),
+            shell_kind,
             preedit: None,
             paste_images: settings.paste_images,
             cursor_blink: settings.cursor_blink,

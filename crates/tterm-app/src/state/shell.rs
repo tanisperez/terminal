@@ -90,6 +90,22 @@ pub fn wsl_path(path: &str) -> String {
     }
 }
 
+/// A WSL path under `/mnt/<drive>` as Windows reads it: `/mnt/c/Users/me` is `C:\Users\me`.
+/// Other paths stay.
+pub fn windows_path(path: &str) -> String {
+    let Some(rest) = path.strip_prefix("/mnt/") else {
+        return path.to_string();
+    };
+    let mut chars = rest.chars();
+    match (chars.next(), chars.next()) {
+        (Some(drive), None | Some('/')) if drive.is_ascii_alphabetic() => {
+            let tail = rest.get(2..).unwrap_or("").replace('/', "\\");
+            format!("{}:\\{tail}", drive.to_ascii_uppercase())
+        }
+        _ => path.to_string(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -103,6 +119,14 @@ mod tests {
             "'/home/me/Captura de pantalla.png'"
         );
         assert_eq!(quote("it's"), r"'it'\''s'");
+    }
+
+    #[test]
+    fn wsl_mounts_are_windows_paths() {
+        assert_eq!(windows_path("/mnt/c/Users/me/dev"), r"C:\Users\me\dev");
+        assert_eq!(windows_path("/mnt/d"), r"D:\");
+        assert_eq!(windows_path("/home/me"), "/home/me");
+        assert_eq!(windows_path("/mnt/wsl/x"), "/mnt/wsl/x");
     }
 
     #[test]

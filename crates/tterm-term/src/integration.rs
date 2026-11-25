@@ -10,7 +10,8 @@
 //!   runs the usual startup files itself.
 //! - fish: the scripts' folder is prepended to `XDG_DATA_DIRS`.
 //!
-//! Other shells, and Windows (where WSL runs its own shells), are left as they are.
+//! Other shells are left as they are. On Windows, a WSL tab runs a small launcher inside the
+//! distribution ([`wsl`]) that does the same for the user's login shell there.
 
 use std::ffi::OsString;
 use std::path::Path;
@@ -125,6 +126,73 @@ pub fn for_this_system(launch: Launch) -> Launch {
     }
 }
 
+/// The launcher a WSL tab runs inside the distribution: it finds the user's login shell and
+/// starts it with Ghostty's scripts, as [`integrate`] does on Unix. It sits next to the
+/// `shell-integration` folder, which it finds through its own path.
+const WSL_LAUNCHER: &str = r#"# tterm: starts the login shell of this WSL user with Ghostty's shell integration.
+r=$(dirname "$0")
+i="$r/shell-integration"
+s=$(getent passwd "$(id -un)" | cut -d: -f7)
+[ -x "$s" ] || s=/bin/sh
+export GHOSTTY_RESOURCES_DIR="$r" GHOSTTY_SHELL_FEATURES=
+case "${s##*/}" in
+bash)
+    [ -n "$ENV" ] && export GHOSTTY_BASH_ENV="$ENV"
+    export ENV="$i/bash/ghostty.bash" GHOSTTY_BASH_INJECT=1
+    if [ -z "$HISTFILE" ]; then
+        export HISTFILE="$HOME/.bash_history" GHOSTTY_BASH_UNEXPORT_HISTFILE=1
+    fi
+    exec "$s" --posix -l ;;
+zsh)
+    [ -n "$ZDOTDIR" ] && export GHOSTTY_ZSH_ZDOTDIR="$ZDOTDIR"
+    export ZDOTDIR="$i/zsh"
+    exec "$s" -l ;;
+fish)
+    export GHOSTTY_SHELL_INTEGRATION_XDG_DIR="$i"
+    export XDG_DATA_DIRS="$i:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
+    exec "$s" -l ;;
+esac
+exec "$s" -l
+"#;
+
+/// Writes the WSL launcher next to Ghostty's scripts (once, or when it changed) and returns its
+/// path, as Windows sees it.
+pub fn wsl_launcher() -> std::io::Result<std::path::PathBuf> {
+    let path = ghostty_vt::shell_integration::resources_dir()?.join("tterm-wsl.sh");
+    if std::fs::read(&path).ok().as_deref() != Some(WSL_LAUNCHER.as_bytes()) {
+        std::fs::write(&path, WSL_LAUNCHER)?;
+    }
+    Ok(path)
+}
+
+/// A WSL tab's command (`wsl.exe`, `wsl.exe -d Ubuntu`) with the folder to start in (`cd`, a
+/// path inside the distribution) and the shell integration (`launcher`, the launcher's path
+/// inside the distribution). A command that already runs a program of its own (`-e`, `--`) or
+/// has a folder (`--cd`, `~`) keeps those parts as they are.
+pub fn wsl(command: &[OsString], cd: Option<&str>, launcher: Option<&str>) -> Vec<OsString> {
+    let Some((program, args)) = command.split_first() else {
+        return command.to_vec();
+    };
+    let has = |names: &[&str]| args.iter().any(|arg| names.iter().any(|name| arg == *name));
+    // `--cd` goes first: after `-e` it would be an argument of the program.
+    let mut out = vec![program.clone()];
+    if let Some(cd) = cd
+        && !has(&["--cd", "~"])
+    {
+        out.push("--cd".into());
+        out.push(cd.into());
+    }
+    out.extend(args.iter().cloned());
+    // Only options before a program of its own: `-d`, `-u`, `--cd` and their values.
+    let runs_program = has(&["-e", "--exec", "--", "--shell-type", "--system"]);
+    if let Some(launcher) = launcher
+        && !runs_program
+    {
+        out.extend(["-e".into(), "sh".into(), launcher.into()]);
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -219,5 +287,43 @@ mod tests {
         );
         assert_eq!(launch.command.len(), 3);
         assert!(launch.env.is_empty());
+    }
+
+    fn os(args: &[&str]) -> Vec<OsString> {
+        args.iter().map(OsString::from).collect()
+    }
+
+    #[test]
+    fn a_wsl_tab_starts_in_its_folder_with_the_launcher() {
+        assert_eq!(
+            wsl(
+                &os(&["wsl.exe", "-d", "Ubuntu"]),
+                Some("/home/me/dev"),
+                Some("/mnt/c/r/l.sh")
+            ),
+            os(&[
+                "wsl.exe",
+                "--cd",
+                "/home/me/dev",
+                "-d",
+                "Ubuntu",
+                "-e",
+                "sh",
+                "/mnt/c/r/l.sh"
+            ])
+        );
+        assert_eq!(wsl(&os(&["wsl.exe"]), None, None), os(&["wsl.exe"]));
+    }
+
+    #[test]
+    fn a_wsl_command_keeps_its_own_folder_and_program() {
+        assert_eq!(
+            wsl(&os(&["wsl.exe", "~"]), Some("/tmp"), Some("/l.sh")),
+            os(&["wsl.exe", "~", "-e", "sh", "/l.sh"])
+        );
+        assert_eq!(
+            wsl(&os(&["wsl.exe", "-e", "htop"]), Some("/tmp"), Some("/l.sh")),
+            os(&["wsl.exe", "--cd", "/tmp", "-e", "htop"])
+        );
     }
 }

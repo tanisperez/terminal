@@ -42,7 +42,9 @@ Expo/React Native conventions here.
   report the folder (OSC 7, `kitty-shell-cwd://`) and the prompts (OSC 133).
   `GHOSTTY_SHELL_FEATURES` is empty: tterm names its tabs and draws its cursor itself. A new
   tab starts in the active tab's folder, from OSC 7 or, on Linux, the foreground program's
-  folder in `/proc`. Not on Windows, where WSL runs its own shells.
+  folder in `/proc`. A WSL tab runs `wsl.exe --cd <folder> -e sh tterm-wsl.sh`: a launcher
+  written next to the scripts, which starts the user's login shell in the distribution with
+  the same injection. A folder under `/mnt/<drive>` opens a Windows tab in that drive.
 - Programs see `TERM=xterm-ghostty` with Ghostty's terminfo (written to a cache folder by
   `ghostty_vt::terminfo::dir`), `COLORTERM=truecolor` and `TERM_PROGRAM=tterm`.
 - Languages of the UI: **English** (source and fallback) and **Spanish**, as ted.
