@@ -98,7 +98,14 @@ pub fn profile_keys(number: u8) -> Vec<String> {
 /// Binds the app's shortcuts.
 pub fn bind_keys(cx: &mut App) {
     let context = Some(CONTEXT);
-    cx.bind_keys([KeyBinding::new("escape", CloseUsage, Some("UsageScreen"))]);
+    // The usage screen (#58): its shortcut opens it, and pressed again, or Esc, closes it.
+    cx.bind_keys([
+        KeyBinding::new("escape", CloseUsage, Some("UsageScreen")),
+        #[cfg(target_os = "macos")]
+        KeyBinding::new("cmd-shift-a", CloseUsage, Some("UsageScreen")),
+        #[cfg(not(target_os = "macos"))]
+        KeyBinding::new("ctrl-shift-a", CloseUsage, Some("UsageScreen")),
+    ]);
     // gpui-kit's root moves the focus with Tab and Shift+Tab. In a terminal they belong to the
     // shell (completion, reverse completion): `NoAction` in the deeper context masks the root's
     // bindings, so the keys reach `TerminalView::on_key_down`.
@@ -134,6 +141,7 @@ pub fn bind_keys(cx: &mut App) {
         KeyBinding::new("cmd--", ZoomOut, context),
         KeyBinding::new("cmd-0", ZoomReset, context),
         KeyBinding::new("cmd-,", OpenSettings, context),
+        KeyBinding::new("cmd-shift-a", OpenUsage, context),
     ]);
     #[cfg(not(target_os = "macos"))]
     cx.bind_keys([
@@ -153,6 +161,7 @@ pub fn bind_keys(cx: &mut App) {
         KeyBinding::new("ctrl--", ZoomOut, context),
         KeyBinding::new("ctrl-0", ZoomReset, context),
         KeyBinding::new("ctrl-,", OpenSettings, context),
+        KeyBinding::new("ctrl-shift-a", OpenUsage, context),
     ]);
 
     // Ctrl+C copies when there is a selection and interrupts otherwise; Ctrl+V pastes, so

@@ -1084,7 +1084,9 @@ impl AppView {
                     .mt(px(BAR_BUTTON_TOP))
                     .mr(px(2.0))
                     .tooltip(|window, cx| {
-                        Tooltip::new(SharedString::from(t!("usage.open"))).build(window, cx)
+                        Tooltip::new(SharedString::from(t!("usage.open")))
+                            .action(&OpenUsage, Some(CONTEXT))
+                            .build(window, cx)
                     })
                     .on_click(
                         cx.listener(|view, _, window, cx| view.open_usage(&OpenUsage, window, cx)),

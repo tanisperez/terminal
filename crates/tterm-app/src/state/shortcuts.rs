@@ -102,6 +102,7 @@ pub fn groups() -> Vec<ShortcutGroup> {
             title: t!("shortcuts.group.window").to_string(),
             shortcuts: vec![
                 Shortcut::open_sheet(),
+                row("shortcuts.action.usage", &app("A")),
                 row("shortcuts.action.settings", &[ZOOM, ","]),
             ],
         },

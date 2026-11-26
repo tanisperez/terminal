@@ -77,7 +77,7 @@ Expo/React Native conventions here.
   startup.
 - Agent usage (#6, decided on 2026-11-23) comes from Claude Code only, for now: the `usage` of
   each assistant message in `~/.claude/projects/*/*.jsonl`, read in the background when the
-  screen opens. Since 0.3.0 the screen has three sections (designs H3 to H5): Spend
+  screen opens. Ctrl+Shift+A (Cmd+Shift+A) opens the screen and closes it, as Esc does (#58). Since 0.3.0 the screen has three sections (designs H3 to H5): Spend
   (the 5-hour block against the largest one, the context of the open sessions, the cost at API
   prices against the period before, where the tokens come from), Projects (by `cwd`, and the
   latest sessions with their peak context) and Habits (prompts by weekday and hour, the days
