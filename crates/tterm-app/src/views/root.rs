@@ -69,6 +69,8 @@ pub struct AppView {
     /// How this copy was installed, as far as updates care. Read once at startup.
     pub(crate) update_env: crate::state::update::UpdateEnv,
     _subscriptions: Vec<Subscription>,
+    /// The title last given to the window, so it is only set again when it changes.
+    window_title: String,
     /// The tab being dragged, while the mouse is outside the window: dropping it there moves it
     /// to a new window (#34, design X1).
     tab_drag_outside: Option<usize>,
@@ -196,6 +198,7 @@ impl AppView {
             update_env: crate::state::update::UpdateEnv::detect(),
             _subscriptions: Vec::new(),
             terminal_subscriptions: Vec::new(),
+            window_title: String::new(),
             tab_drag_outside: None,
             tab_scroll: ScrollHandle::new(),
             tab_strip: StripFlags::default(),
@@ -1486,6 +1489,23 @@ fn bar_button(id: &'static str, icon: IconName, palette: &Palette) -> Stateful<D
         .child(Icon::new(icon).with_size(px(16.0)))
 }
 
+impl AppView {
+    /// The window's title, shown by the taskbar, the window switcher and the dock: the active
+    /// tab's, then the app's name, as ted. The bar draws its own, so the platform's is unseen in
+    /// the window itself.
+    fn update_window_title(&mut self, tab: Option<&Tab>, window: &mut Window, cx: &App) {
+        let name = tterm_cli::IDENTITY.name;
+        let title = match tab.map(|tab| tab.focused.read(cx).label()) {
+            Some(label) if !label.is_empty() => format!("{label} \u{b7} {name}"),
+            _ => name.to_string(),
+        };
+        if title != self.window_title {
+            window.set_window_title(&title);
+            self.window_title = title;
+        }
+    }
+}
+
 /// Wraps a control of the bar so the mouse reaches it: `TitleBar` marks the whole bar as a window
 /// drag area, and on Windows the system would eat the control's clicks (as in ted).
 fn no_drag(control: impl IntoElement) -> impl IntoElement {
@@ -1493,9 +1513,10 @@ fn no_drag(control: impl IntoElement) -> impl IntoElement {
 }
 
 impl Render for AppView {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let palette = cx.palette();
         let active = self.tabs.active().cloned();
+        self.update_window_title(active.as_ref(), window, cx);
         // The usage screen takes the whole window; the terminals keep running behind it.
         if let Some((usage, _)) = self.usage.as_ref() {
             return v_flex()
