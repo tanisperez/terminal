@@ -9,6 +9,7 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Datelike as _, Duration, Local, NaiveDate, Utc};
 use gpui_kit::assets::IconName;
+use gpui_kit::component::scroll::{Scrollbar, ScrollbarMode};
 use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::*;
 use gpui_kit::prelude::*;
@@ -138,6 +139,8 @@ pub struct UsageView {
     insights: Option<Insights>,
     block: Option<BlockNow>,
     sessions: Vec<SessionRow>,
+    /// The scroll of each section, Spend, Projects and Habits, with its scrollbar.
+    scroll: [ScrollHandle; 3],
     _load: Task<()>,
 }
 
@@ -189,6 +192,7 @@ impl UsageView {
             insights: None,
             block: None,
             sessions: Vec::new(),
+            scroll: Default::default(),
             _load: load,
         }
     }
@@ -424,15 +428,11 @@ impl UsageView {
             .size_full()
             .items_start()
             .child(self.render_side(palette))
-            .child(
-                div()
-                    .id("usage-spend-scroll")
-                    .flex_1()
-                    .min_w_0()
-                    .h_full()
-                    .overflow_y_scroll()
-                    .child(right),
-            )
+            .child(div().flex_1().min_w_0().h_full().child(scrolled(
+                "usage-spend-scroll",
+                &self.scroll[0],
+                right,
+            )))
             .into_any_element()
     }
 
@@ -532,18 +532,16 @@ impl UsageView {
                 palette,
             ));
         }
-        div()
-            .id("usage-projects-scroll")
-            .size_full()
-            .overflow_y_scroll()
-            .child(
-                v_flex()
-                    .p(px(20.0))
-                    .gap(px(24.0))
-                    .child(projects)
-                    .child(sessions),
-            )
-            .into_any_element()
+        scrolled(
+            "usage-projects-scroll",
+            &self.scroll[1],
+            v_flex()
+                .p(px(20.0))
+                .gap(px(24.0))
+                .child(projects)
+                .child(sessions),
+        )
+        .into_any_element()
     }
 
     /// Habits (H5): the key numbers, when the agents work, the days with agents and the models
@@ -590,26 +588,53 @@ impl UsageView {
                 t!("usage.weekends_note").into_owned(),
                 palette,
             ));
-        div()
-            .id("usage-habits-scroll")
-            .size_full()
-            .overflow_y_scroll()
-            .child(
-                v_flex()
-                    .p(px(20.0))
-                    .gap(px(22.0))
-                    .child(kpis)
-                    .child(
-                        h_flex()
-                            .items_start()
-                            .gap(px(28.0))
-                            .child(heat_map(habits, palette))
-                            .child(calendar(habits, palette)),
-                    )
-                    .child(weekly_models(habits, palette)),
-            )
-            .into_any_element()
+        scrolled(
+            "usage-habits-scroll",
+            &self.scroll[2],
+            v_flex()
+                .p(px(20.0))
+                .gap(px(22.0))
+                .child(kpis)
+                .child(
+                    h_flex()
+                        .items_start()
+                        .gap(px(28.0))
+                        .child(heat_map(habits, palette))
+                        .child(calendar(habits, palette)),
+                )
+                .child(weekly_models(habits, palette)),
+        )
+        .into_any_element()
     }
+}
+
+/// `content` in a box that scrolls down, with a scrollbar that always shows (#61), over the
+/// screen's background with no track of its own, as What's new.
+fn scrolled(id: &'static str, scroll: &ScrollHandle, content: impl IntoElement) -> Div {
+    let track = gpui_kit::transparent_black();
+    div()
+        .relative()
+        .size_full()
+        .child(
+            div()
+                .id(id)
+                .size_full()
+                .overflow_y_scroll()
+                .track_scroll(scroll)
+                .child(content),
+        )
+        .child(
+            div().absolute().inset_0().child(
+                Scrollbar::vertical(scroll)
+                    .mode(ScrollbarMode::Always)
+                    .styles(move |styles| {
+                        styles
+                            .track(|style| style.bg(track).border_color(track))
+                            .track_hover(|style| style.bg(track).border_color(track))
+                            .track_active(|style| style.bg(track).border_color(track))
+                    }),
+            ),
+        )
 }
 
 impl Render for UsageView {
