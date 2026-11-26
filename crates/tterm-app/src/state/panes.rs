@@ -35,6 +35,76 @@ impl Direction {
     }
 }
 
+/// The side of a pane a dropped tab or pane takes (#56, design J1).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Side {
+    /// The left half.
+    Left,
+    /// The right half.
+    Right,
+    /// The top half.
+    Top,
+    /// The bottom half.
+    Bottom,
+}
+
+impl Side {
+    /// The axis of the split the drop makes.
+    pub fn axis(self) -> Axis {
+        match self {
+            Side::Left | Side::Right => Axis::Horizontal,
+            Side::Top | Side::Bottom => Axis::Vertical,
+        }
+    }
+
+    /// Whether the dropped panes go first: on the left or on top.
+    pub fn goes_first(self) -> bool {
+        matches!(self, Side::Left | Side::Top)
+    }
+
+    /// The half of `area` the dropped panes take, for the preview.
+    pub fn half(self, area: Rect) -> Rect {
+        match self {
+            Side::Left => Rect {
+                w: area.w / 2.0,
+                ..area
+            },
+            Side::Right => Rect {
+                x: area.x + area.w / 2.0,
+                w: area.w / 2.0,
+                ..area
+            },
+            Side::Top => Rect {
+                h: area.h / 2.0,
+                ..area
+            },
+            Side::Bottom => Rect {
+                y: area.y + area.h / 2.0,
+                h: area.h / 2.0,
+                ..area
+            },
+        }
+    }
+}
+
+/// The side of a pane of `width` by `height` that a point at `x`, `y` from its top left corner
+/// picks: the pane's diagonals split it in four, so the nearest edge, relative to the size of
+/// the pane, wins (design J1).
+pub fn drop_side(x: f32, y: f32, width: f32, height: f32) -> Side {
+    let nx = if width > 0.0 { x / width } else { 0.5 };
+    let ny = if height > 0.0 { y / height } else { 0.5 };
+    [
+        (nx, Side::Left),
+        (1.0 - nx, Side::Right),
+        (ny, Side::Top),
+        (1.0 - ny, Side::Bottom),
+    ]
+    .into_iter()
+    .min_by(|a, b| a.0.total_cmp(&b.0))
+    .map(|(_, side)| side)
+    .unwrap_or(Side::Right)
+}
+
 /// The smallest share of a split a half keeps when resized.
 pub const MIN_RATIO: f32 = 0.1;
 /// How much a resize shortcut moves a separator, as a share of its split.
@@ -117,6 +187,44 @@ impl<T: Clone + PartialEq> PaneTree<T> {
             PaneTree::Leaf(_) => false,
             PaneTree::Split { first, second, .. } => {
                 first.split(pane, axis, new.clone()) || second.split(pane, axis, new)
+            }
+        }
+    }
+
+    /// The pane under a point of the unit square of the tab, and where that pane sits.
+    pub fn pane_at(&self, x: f32, y: f32) -> Option<(T, Rect)> {
+        self.rects()
+            .into_iter()
+            .find(|(_, r)| x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h)
+    }
+
+    /// Puts `branch` (the panes of a dropped tab, or one pane) at `side` of `pane`, in half of its
+    /// place (#56, designs J1 and J4). Returns whether `pane` was found.
+    pub fn insert(&mut self, pane: &T, side: Side, branch: PaneTree<T>) -> bool {
+        match self {
+            PaneTree::Leaf(leaf) if leaf == pane => {
+                let old = Box::new(PaneTree::Leaf(leaf.clone()));
+                let new = Box::new(branch);
+                let (first, second) = if side.goes_first() {
+                    (new, old)
+                } else {
+                    (old, new)
+                };
+                *self = PaneTree::Split {
+                    axis: side.axis(),
+                    ratio: 0.5,
+                    first,
+                    second,
+                };
+                true
+            }
+            PaneTree::Leaf(_) => false,
+            PaneTree::Split { first, second, .. } => {
+                if first.contains(pane) {
+                    first.insert(pane, side, branch)
+                } else {
+                    second.insert(pane, side, branch)
+                }
             }
         }
     }
@@ -449,6 +557,64 @@ mod tests {
             Some(Focus(Direction::Left))
         );
         assert_eq!(pane_shortcut("up", true, true), Some(Resize(Direction::Up)));
+    }
+
+    #[test]
+    fn the_nearest_edge_picks_the_side() {
+        // A wide pane: the diagonals, not the middle lines, decide.
+        assert_eq!(drop_side(900.0, 300.0, 1000.0, 600.0), Side::Right);
+        assert_eq!(drop_side(100.0, 300.0, 1000.0, 600.0), Side::Left);
+        assert_eq!(drop_side(500.0, 40.0, 1000.0, 600.0), Side::Top);
+        assert_eq!(drop_side(500.0, 560.0, 1000.0, 600.0), Side::Bottom);
+        // Off center but nearer the top edge, relative to the size.
+        assert_eq!(drop_side(300.0, 100.0, 1000.0, 600.0), Side::Top);
+        assert_eq!(drop_side(150.0, 100.0, 1000.0, 600.0), Side::Left);
+    }
+
+    #[test]
+    fn a_dropped_branch_takes_half_of_the_pane() {
+        let mut tree = three();
+        assert!(tree.insert(&'c', Side::Left, PaneTree::Leaf('d')));
+        assert_eq!(tree.leaves(), vec!['a', 'b', 'd', 'c']);
+        let d = tree
+            .rects()
+            .into_iter()
+            .find(|(p, _)| *p == 'd')
+            .map(|(_, r)| r);
+        assert_eq!(
+            d,
+            Some(Rect {
+                x: 0.5,
+                y: 0.5,
+                w: 0.25,
+                h: 0.5
+            })
+        );
+        // A whole tree goes in as a branch, keeping its layout (J4).
+        let mut dropped = PaneTree::Leaf('x');
+        dropped.split(&'x', Axis::Vertical, 'y');
+        let mut tree = PaneTree::Leaf('a');
+        assert!(tree.insert(&'a', Side::Bottom, dropped));
+        assert_eq!(tree.leaves(), vec!['a', 'x', 'y']);
+        assert_eq!(tree.rects()[2].1.y, 0.75);
+        assert!(!tree.insert(&'z', Side::Top, PaneTree::Leaf('q')));
+    }
+
+    #[test]
+    fn the_pane_under_a_point_and_its_preview() {
+        let tree = three();
+        assert_eq!(tree.pane_at(0.2, 0.9).map(|(p, _)| p), Some('a'));
+        assert_eq!(tree.pane_at(0.7, 0.7).map(|(p, _)| p), Some('c'));
+        let b = tree.pane_at(0.7, 0.2).map(|(_, r)| r);
+        assert_eq!(
+            b.map(|b| Side::Bottom.half(b)),
+            Some(Rect {
+                x: 0.5,
+                y: 0.25,
+                w: 0.5,
+                h: 0.25
+            })
+        );
     }
 
     #[test]

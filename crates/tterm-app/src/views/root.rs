@@ -38,6 +38,8 @@ use super::terminal::{TabHover, TerminalEvent, TerminalView};
 use super::usage::{UsageEvent, UsageView};
 use crate::state::panes::{self, Axis, Direction, PaneSplit, PaneTree};
 
+mod join;
+
 /// The root view of the window.
 pub struct AppView {
     pub(crate) settings: Settings,
@@ -80,6 +82,8 @@ pub struct AppView {
     tab_scrolled_to: Option<usize>,
     /// Frames left to check that the active tab is fully in view, see [`REVEAL_FRAMES`].
     tab_reveal_frames: u8,
+    /// Tabs dragged onto panes, and panes that leave their tab (#56, #57).
+    join: join::JoinState,
 }
 
 /// A tab: its panes and the one with the focus, which names the tab (#33, design S1).
@@ -197,7 +201,9 @@ impl AppView {
             tab_strip: StripFlags::default(),
             tab_scrolled_to: None,
             tab_reveal_frames: 0,
+            join: join::JoinState::default(),
         };
+        join::register(window, cx);
         view.rebuild_profiles();
         match first {
             crate::FirstTabs::Folders(dirs) => view.start_first_window(dirs, window, cx),
@@ -419,11 +425,29 @@ impl AppView {
             PaneTree::Leaf(terminal) => {
                 let dim = multiple && terminal != focused;
                 let veil = crate::theme::palette::scheme(cx).background;
+                let preview = self
+                    .join
+                    .drop
+                    .as_ref()
+                    .filter(|drop| &drop.terminal == terminal)
+                    .map(|drop| drop.side);
+                let palette = cx.palette();
+                let over = terminal.clone();
                 div()
+                    .id(("pane", terminal.entity_id()))
                     .relative()
                     .size_full()
                     .overflow_hidden()
                     .child(terminal.clone())
+                    // A tab dragged over the pane shows the half it would take (#56, J1).
+                    .on_drag_move(cx.listener(
+                        move |view, event: &DragMoveEvent<DraggedTab>, _, cx| {
+                            view.track_pane_drop(&over, event, cx)
+                        },
+                    ))
+                    .when_some(preview, |pane, side| {
+                        pane.child(join::drop_preview(side, &palette))
+                    })
                     .when(dim, |pane| {
                         pane.child(
                             div()
@@ -676,6 +700,8 @@ impl AppView {
                 self.focus_pane(terminal, *direction, window, cx)
             }
             TerminalEvent::ResizePane(direction) => self.resize_pane(terminal, *direction, cx),
+            TerminalEvent::MoveToTab => self.move_pane_to_tab(terminal, window, cx),
+            TerminalEvent::MoveToWindow => self.move_pane_to_window(terminal, window, cx),
         }
     }
 
@@ -1192,6 +1218,7 @@ impl AppView {
             }))
             .child(Icon::new(IconName::X).with_size(px(12.0)));
         let accent = palette.accent;
+        let dragging = self.join.dragging == Some(index) && cx.has_active_drag();
         let dragged = DraggedTab {
             index,
             label: label.clone().into(),
@@ -1287,6 +1314,13 @@ impl AppView {
             .on_drop(cx.listener(move |view, dragged: &DraggedTab, _, cx| {
                 view.move_tab(dragged.index, index, cx)
             }))
+            // Resting a dragged tab here opens this one, to drop it on its panes (#56, J2).
+            .on_drag_move(cx.listener(
+                move |view, event: &DragMoveEvent<DraggedTab>, window, cx| {
+                    view.track_spring(index, event, window, cx)
+                },
+            ))
+            .when(dragging, |tab| tab.opacity(0.4))
             .context_menu(move |menu, _, cx| tab_menu(menu, index, &menu_view, cx))
     }
 }
@@ -1458,17 +1492,32 @@ impl Render for AppView {
             .on_action(cx.listener(Self::close_tab))
             // A tab dragged out of the window and dropped there opens in a window of its own
             // where it is dropped (#34, design X1).
+            // Over another window of tterm, it joins one of its panes instead (#56, J3).
             .on_drag_move(
                 cx.listener(|view, event: &DragMoveEvent<DraggedTab>, window, cx| {
+                    let index = event.drag(cx).index;
+                    if view.join.dragging != Some(index) {
+                        view.join.dragging = Some(index);
+                        cx.notify();
+                    }
+                    let position = event.event.position;
                     let inside = Bounds::new(point(px(0.0), px(0.0)), window.viewport_size())
-                        .contains(&event.event.position);
-                    view.tab_drag_outside = (!inside).then(|| event.drag(cx).index);
+                        .contains(&position);
+                    view.tab_drag_outside = (!inside).then_some(index);
+                    if inside {
+                        view.leave_external(cx);
+                    } else {
+                        view.track_external(position, window, cx);
+                    }
                 }),
             )
             .on_mouse_up_out(
                 MouseButton::Left,
                 cx.listener(|view, event: &MouseUpEvent, window, cx| {
-                    if let Some(index) = view.tab_drag_outside.take() {
+                    view.join.dragging = None;
+                    if let Some(index) = view.tab_drag_outside.take()
+                        && !view.finish_external(index, window, cx)
+                    {
                         let at = window.bounds().origin + event.position;
                         view.move_tab_to_new_window(index, Some(at), window, cx);
                     }
@@ -1476,7 +1525,10 @@ impl Render for AppView {
             )
             .on_mouse_up(
                 MouseButton::Left,
-                cx.listener(|view, _, _, _| view.tab_drag_outside = None),
+                cx.listener(|view, _, window, cx| {
+                    view.tab_drag_outside = None;
+                    view.finish_tab_drag(window, cx);
+                }),
             )
             .on_action(cx.listener(|view, _: &MoveTabToNewWindow, window, cx| {
                 let index = view.tabs.active_index();
@@ -1494,9 +1546,18 @@ impl Render for AppView {
             .child(self.render_bar(&palette, cx))
             .child(
                 div()
+                    .relative()
                     .flex_1()
                     .min_h_0()
-                    .when_some(active, |area, tab| area.child(self.render_panes(&tab, cx))),
+                    .when_some(active, |area, tab| area.child(self.render_panes(&tab, cx)))
+                    .child({
+                        let cell = self.join.panes_bounds.clone();
+                        canvas(move |bounds, _, _| cell.set(bounds), |_, _, _, _| {})
+                            .absolute()
+                            .top_0()
+                            .left_0()
+                            .size_full()
+                    }),
             )
             .when_some(self.picker.as_ref(), |root, (picker, _)| {
                 root.child(picker.clone())

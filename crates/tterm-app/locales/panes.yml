@@ -12,3 +12,21 @@ _version: 2
 "panes.close":
   en: "Close Pane   Ctrl+Shift+W"
   es: "Cerrar panel   Ctrl+Shift+W"
+"panes.move_to_tab":
+  en: "Move to New Tab"
+  es: "Mover a una pestaña nueva"
+"panes.move_to_window":
+  en: "Move to New Window"
+  es: "Mover a una ventana nueva"
+"panes.drop_left":
+  en: "Pane on the left"
+  es: "Panel a la izquierda"
+"panes.drop_right":
+  en: "Pane on the right"
+  es: "Panel a la derecha"
+"panes.drop_top":
+  en: "Pane on top"
+  es: "Panel arriba"
+"panes.drop_bottom":
+  en: "Pane below"
+  es: "Panel abajo"

@@ -61,6 +61,12 @@ impl<T> Tabs<T> {
         self.active = at;
     }
 
+    /// Adds a tab at the end and activates it: a pane that leaves its tab (#57, design J5).
+    pub fn open_last(&mut self, tab: T) {
+        self.tabs.push(tab);
+        self.active = self.tabs.len() - 1;
+    }
+
     /// Removes the tab at `index` and returns it. The active tab stays the same one when another
     /// tab closes; when the active one closes, the one that took its place (or the previous, at
     /// the end) becomes active.
@@ -295,6 +301,20 @@ mod tests {
 
     fn names(tabs: &Tabs<&'static str>) -> Vec<&'static str> {
         tabs.iter().copied().collect()
+    }
+
+    #[test]
+    fn a_tab_opened_last_goes_to_the_end_and_is_active() {
+        let mut tabs = Tabs::default();
+        tabs.open('a');
+        tabs.open('b');
+        tabs.activate(0);
+        tabs.open_last('c');
+        assert_eq!(
+            tabs.iter().copied().collect::<Vec<_>>(),
+            vec!['a', 'b', 'c']
+        );
+        assert_eq!(tabs.active_index(), 2);
     }
 
     #[test]

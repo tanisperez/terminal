@@ -79,6 +79,10 @@ pub enum TerminalEvent {
     ResizePane(Direction),
     /// Close this pane, from the menu.
     ClosePane,
+    /// Move this pane to a tab of its own (#57, design J5).
+    MoveToTab,
+    /// Move this pane to a window of its own (#57, design J5).
+    MoveToWindow,
 }
 
 /// The size of one cell for the font in use.
@@ -1234,6 +1238,7 @@ impl Render for TerminalView {
         let menu = (!self.emulator.mouse_tracking()).then(|| {
             let focus = self.focus.clone();
             let has_selection = self.has_selection();
+            let split = self.split;
             let view = cx.weak_entity();
             move |menu: PopupMenu, window: &mut Window, cx: &mut Context<PopupMenu>| {
                 // A right click on a link offers to open it or copy it first.
@@ -1280,6 +1285,20 @@ impl Render for TerminalView {
                         TerminalEvent::Split(PaneSplit::Duplicate),
                     ))
                     .separator()
+                    // A pane leaves its tab only when the tab keeps another one (J5).
+                    .when(split, |menu| {
+                        menu.item(pane_item(
+                            &view,
+                            t!("panes.move_to_tab"),
+                            TerminalEvent::MoveToTab,
+                        ))
+                        .item(pane_item(
+                            &view,
+                            t!("panes.move_to_window"),
+                            TerminalEvent::MoveToWindow,
+                        ))
+                        .separator()
+                    })
                     .item(pane_item(
                         &view,
                         t!("panes.close"),

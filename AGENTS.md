@@ -108,6 +108,11 @@ Expo/React Native conventions here.
   with new tabs inheriting the active tab's folder unless Settings says otherwise (#28); Nerd
   Font icons in the bundled fonts, CaskaydiaCove Nerd Font Mono by default (#35). Each one is
   designed in the Artifact first.
+- Tabs into panes (#56, #57, designs J1 to J5, `views/root/join.rs`): a tab dragged over a pane
+  joins it on the side the pane's diagonals pick (`panes::drop_side`), whole with its own panes.
+  Resting the dragged tab still for half a second on another tab opens it. Over another window
+  it joins that window, except on Wayland, where gpui does not know where windows are and the
+  tab opens in a new window as before. The pane menu moves a pane to a new tab or window.
 
 ## Pending decisions (ask before choosing)
 
