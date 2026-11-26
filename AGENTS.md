@@ -112,7 +112,9 @@ Expo/React Native conventions here.
   joins it on the side the pane's diagonals pick (`panes::drop_side`), whole with its own panes.
   Resting the dragged tab still for half a second on another tab opens it. Over another window
   it joins that window, except on Wayland, where gpui does not know where windows are and the
-  tab opens in a new window as before. The pane menu moves a pane to a new tab or window.
+  tab opens in a new window as before. The pane menu moves a pane to a new tab or window, and
+  so does dragging a pane with Alt held (J5): over another pane it joins it, on the bar it
+  opens a tab, outside the window it joins the window under it or opens a new one.
 
 ## Pending decisions (ask before choosing)
 

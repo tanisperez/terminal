@@ -15,6 +15,9 @@ _version: 2
 "shortcuts.key.click":
   en: "Click"
   es: "Clic"
+"shortcuts.key.drag":
+  en: "Drag"
+  es: "Arrastrar"
 "shortcuts.action.new_tab":
   en: "New tab with the default profile"
   es: "Nueva pestaña con el perfil por defecto"
@@ -51,6 +54,9 @@ _version: 2
 "shortcuts.action.pane_resize":
   en: "Resize the pane"
   es: "Cambiar el tamaño del panel"
+"shortcuts.action.pane_move":
+  en: "Move the pane to another pane, the bar or out of the window"
+  es: "Mover el panel a otro panel, a la barra o fuera de la ventana"
 "shortcuts.action.copy":
   en: "Copy the selection, or interrupt without one"
   es: "Copiar la selección, o interrumpir si no hay"

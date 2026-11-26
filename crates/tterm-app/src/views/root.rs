@@ -433,6 +433,7 @@ impl AppView {
                     .map(|drop| drop.side);
                 let palette = cx.palette();
                 let over = terminal.clone();
+                let lifted = self.join.pane.as_ref() == Some(terminal) && cx.has_active_drag();
                 div()
                     .id(("pane", terminal.entity_id()))
                     .relative()
@@ -455,6 +456,11 @@ impl AppView {
                                 .inset_0()
                                 .bg(crate::theme::palette::rgb(veil).opacity(0.45)),
                         )
+                    })
+                    .when(lifted, |pane| pane.opacity(0.4))
+                    // Not while dragging: the layer would hide the drop from the window.
+                    .when(multiple && self.join.alt && !cx.has_active_drag(), |pane| {
+                        pane.child(self.pane_grip(terminal, cx))
                     })
                     .into_any_element()
             }
@@ -943,15 +949,25 @@ impl AppView {
         // the active tab, whose bottom edge is the line's, paints over it and joins the
         // terminal at any scale. It reaches past the row, under the window controls and the
         // macOS traffic lights; the window clips it.
-        let mut row = h_flex().relative().size_full().items_start().child(
-            div()
-                .absolute()
-                .bottom_0()
-                .left(px(-BAR_LINE_REACH))
-                .right(px(-BAR_LINE_REACH))
-                .h(px(1.0))
-                .bg(border),
-        );
+        let mut row = h_flex()
+            .relative()
+            .size_full()
+            .items_start()
+            .child(
+                div()
+                    .absolute()
+                    .bottom_0()
+                    .left(px(-BAR_LINE_REACH))
+                    .right(px(-BAR_LINE_REACH))
+                    .h(px(1.0))
+                    .bg(border),
+            )
+            // A pane dropped anywhere on the bar opens a tab of its own (#57, J5).
+            .on_drop(cx.listener(|view, dragged: &DraggedTab, window, cx| {
+                if let Some(pane) = &dragged.pane {
+                    view.drop_pane_on_bar(pane, window, cx);
+                }
+            }));
         // Tabs shrink to their minimum; past it the strip scrolls (the wheel too: gpui turns it
         // into a horizontal scroll on a row that only scrolls across) and the buttons of the
         // bar stay in place.
@@ -969,9 +985,12 @@ impl AppView {
             .overflow_x_scroll()
             .track_scroll(&handle)
             // Dropped on the bar past the last tab: the tab moves to the end.
-            .on_drop(cx.listener(|view, dragged: &DraggedTab, _, cx| {
-                view.move_tab(dragged.index, usize::MAX, cx)
-            }));
+            .on_drop(cx.listener(
+                |view, dragged: &DraggedTab, window, cx| match &dragged.pane {
+                    Some(pane) => view.drop_pane_on_bar(pane, window, cx),
+                    None => view.move_tab(dragged.index, usize::MAX, cx),
+                },
+            ));
         for (index, tab) in self.tabs.iter().enumerate() {
             let active = index == self.tabs.active_index();
             let label = tab.focused.read(cx).label();
@@ -1218,10 +1237,12 @@ impl AppView {
             }))
             .child(Icon::new(IconName::X).with_size(px(12.0)));
         let accent = palette.accent;
-        let dragging = self.join.dragging == Some(index) && cx.has_active_drag();
+        let dragging =
+            self.join.dragging == Some(index) && self.join.pane.is_none() && cx.has_active_drag();
         let dragged = DraggedTab {
             index,
             label: label.clone().into(),
+            pane: None,
         };
         let menu_view = cx.weak_entity();
         h_flex()
@@ -1303,7 +1324,9 @@ impl AppView {
             // telaio's document tabs.
             .on_drag(dragged, |dragged, _, _, cx| cx.new(|_| dragged.clone()))
             .drag_over::<DraggedTab>(move |style, dragged, _, _| {
-                if dragged.index > index {
+                if dragged.pane.is_some() {
+                    style
+                } else if dragged.index > index {
                     style.border_l_2().border_color(accent)
                 } else if dragged.index < index {
                     style.border_r_2().border_color(accent)
@@ -1311,9 +1334,12 @@ impl AppView {
                     style
                 }
             })
-            .on_drop(cx.listener(move |view, dragged: &DraggedTab, _, cx| {
-                view.move_tab(dragged.index, index, cx)
-            }))
+            .on_drop(cx.listener(
+                move |view, dragged: &DraggedTab, window, cx| match &dragged.pane {
+                    Some(pane) => view.drop_pane_on_bar(pane, window, cx),
+                    None => view.move_tab(dragged.index, index, cx),
+                },
+            ))
             // Resting a dragged tab here opens this one, to drop it on its panes (#56, J2).
             .on_drag_move(cx.listener(
                 move |view, event: &DragMoveEvent<DraggedTab>, window, cx| {
@@ -1325,11 +1351,13 @@ impl AppView {
     }
 }
 
-/// The value carried while a tab is dragged, also its preview under the pointer.
+/// The value carried while a tab is dragged, also its preview under the pointer. A pane dragged
+/// with Alt held (#57, J5) is carried the same way: `index` is its tab and `pane` the pane.
 #[derive(Clone)]
 struct DraggedTab {
     index: usize,
     label: SharedString,
+    pane: Option<Entity<TerminalView>>,
 }
 
 impl Render for DraggedTab {
@@ -1490,14 +1518,25 @@ impl Render for AppView {
             .on_action(cx.listener(Self::new_tab))
             .on_action(cx.listener(Self::open_profile))
             .on_action(cx.listener(Self::close_tab))
+            // Alt held over a split tab lets its panes be dragged (#57, J5).
+            .on_modifiers_changed(cx.listener(|view, event: &ModifiersChangedEvent, _, cx| {
+                let alt = event.modifiers.alt && !event.modifiers.control;
+                if view.join.alt != alt {
+                    view.join.alt = alt;
+                    cx.notify();
+                }
+            }))
             // A tab dragged out of the window and dropped there opens in a window of its own
             // where it is dropped (#34, design X1).
             // Over another window of tterm, it joins one of its panes instead (#56, J3).
             .on_drag_move(
                 cx.listener(|view, event: &DragMoveEvent<DraggedTab>, window, cx| {
-                    let index = event.drag(cx).index;
-                    if view.join.dragging != Some(index) {
+                    let drag = event.drag(cx);
+                    let index = drag.index;
+                    let pane = drag.pane.clone();
+                    if view.join.dragging != Some(index) || view.join.pane != pane {
                         view.join.dragging = Some(index);
+                        view.join.pane = pane;
                         cx.notify();
                     }
                     let position = event.event.position;
@@ -1515,11 +1554,17 @@ impl Render for AppView {
                 MouseButton::Left,
                 cx.listener(|view, event: &MouseUpEvent, window, cx| {
                     view.join.dragging = None;
+                    let pane = view.join.pane.take();
                     if let Some(index) = view.tab_drag_outside.take()
-                        && !view.finish_external(index, window, cx)
+                        && !view.finish_external(index, pane.as_ref(), window, cx)
                     {
-                        let at = window.bounds().origin + event.position;
-                        view.move_tab_to_new_window(index, Some(at), window, cx);
+                        match pane {
+                            Some(pane) => view.move_pane_to_window(&pane, window, cx),
+                            None => {
+                                let at = window.bounds().origin + event.position;
+                                view.move_tab_to_new_window(index, Some(at), window, cx);
+                            }
+                        }
                     }
                 }),
             )

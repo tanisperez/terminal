@@ -7,6 +7,10 @@
 //! any other (J2). Outside the window, over another window of tterm, the same preview shows in
 //! that window and the drop joins it there (J3); where the platform does not tell where the
 //! windows are (Wayland), the tab opens in a new window, as before (#34).
+//!
+//! With Alt held, a pane of a split tab is dragged the same way (J5): over another pane it
+//! joins it, on the bar it opens a tab of its own, and outside the window it joins the window
+//! under it or opens a new one.
 
 use std::cell::Cell;
 use std::rc::Rc;
@@ -43,6 +47,10 @@ pub(super) struct JoinState {
     pub drop: Option<TabDrop>,
     /// The tab of this window being dragged, dimmed in the bar.
     pub dragging: Option<usize>,
+    /// The pane being dragged, when the drag carries one pane of that tab and not all of it.
+    pub pane: Option<Entity<TerminalView>>,
+    /// Whether Alt is held, which lets the panes of a split tab be dragged.
+    pub alt: bool,
     /// The tab a dragged tab rests on, where the pointer rests, and the timer that opens it.
     spring: Option<(usize, Point<Pixels>, Task<()>)>,
     /// The window under a tab dragged out of this one, showing the preview.
@@ -62,7 +70,7 @@ pub(super) fn register(window: &Window, cx: &mut Context<AppView>) {
 
 impl AppView {
     /// A dragged tab moved over the pane of `terminal`: shows where it would land, unless the
-    /// pane is in the dragged tab itself (J2).
+    /// pane is in the dragged tab itself (J2). A dragged pane lands anywhere but on itself.
     pub(super) fn track_pane_drop(
         &mut self,
         terminal: &Entity<TerminalView>,
@@ -71,12 +79,15 @@ impl AppView {
     ) {
         let position = event.event.position;
         let bounds = event.bounds;
-        let dragged = event.drag(cx).index;
-        let own = self
-            .tabs
-            .iter()
-            .nth(dragged)
-            .is_some_and(|tab| tab.panes.contains(terminal));
+        let drag = event.drag(cx);
+        let own = match &drag.pane {
+            Some(pane) => pane == terminal,
+            None => self
+                .tabs
+                .iter()
+                .nth(drag.index)
+                .is_some_and(|tab| tab.panes.contains(terminal)),
+        };
         let drop = if bounds.contains(&position) && !own {
             let side = drop_side(
                 f32::from(position.x - bounds.left()),
@@ -141,15 +152,59 @@ impl AppView {
         self.join.spring = Some((index, position, task));
     }
 
-    /// The drag of a tab ended in this window: a tab over a pane joins it (J1).
+    /// The drag of a tab ended in this window: a tab over a pane joins it (J1), and so does a
+    /// pane (J5).
     pub(super) fn finish_tab_drag(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.join.spring = None;
         let dragging = self.join.dragging.take();
+        let pane = self.join.pane.take();
         let drop = self.join.drop.take();
-        if let (Some(index), Some(drop)) = (dragging, drop) {
-            self.join_tab(index, drop, window, cx);
+        match (pane, dragging, drop) {
+            (Some(pane), _, Some(drop)) => self.join_pane(&pane, drop, window, cx),
+            (None, Some(index), Some(drop)) => self.join_tab(index, drop, window, cx),
+            _ => {}
         }
         cx.notify();
+    }
+
+    /// Moves the pane of `terminal` out of its tab to `drop`'s side of another pane of this
+    /// window, in the same tab or another one (J5).
+    fn join_pane(
+        &mut self,
+        terminal: &Entity<TerminalView>,
+        drop: TabDrop,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if terminal == &drop.terminal || !self.detach_pane(terminal, cx) {
+            return;
+        }
+        log::info!("moving a pane next to another pane");
+        self.insert_tab(Tab::new(terminal.clone()), drop, window, cx);
+    }
+
+    /// The layer over a pane of a split tab while Alt is held: dragging it carries the pane
+    /// (J5).
+    pub(super) fn pane_grip(
+        &self,
+        terminal: &Entity<TerminalView>,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
+        let dragged = DraggedTab {
+            index: self.tab_of(terminal).unwrap_or(self.tabs.active_index()),
+            label: terminal.read(cx).label().into(),
+            pane: Some(terminal.clone()),
+        };
+        let accent = cx.palette().accent;
+        div()
+            .id(("pane-grip", terminal.entity_id()))
+            .absolute()
+            .inset_0()
+            .occlude()
+            .cursor_grab()
+            .border_1()
+            .border_color(accent.opacity(0.5))
+            .on_drag(dragged, |dragged, _, _, cx| cx.new(|_| dragged.clone()))
     }
 
     /// Moves the panes of the tab at `index` to `drop`'s side of its pane, in another tab of this
@@ -246,11 +301,12 @@ impl AppView {
         true
     }
 
-    /// The drag of a tab ended outside this window: joins the window under it, when there is
-    /// one with a preview. Returns whether it did.
+    /// The drag of a tab, or of its pane `pane`, ended outside this window: joins the window
+    /// under it, when there is one with a preview. Returns whether it did.
     pub(super) fn finish_external(
         &mut self,
         index: usize,
+        pane: Option<&Entity<TerminalView>>,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> bool {
@@ -272,11 +328,16 @@ impl AppView {
         else {
             return false;
         };
-        let Some(tab) = self.tabs.close(index) else {
-            return false;
+        let tab = match pane {
+            Some(pane) if self.detach_pane(pane, cx) => Tab::new(pane.clone()),
+            Some(_) => return false,
+            None => match self.tabs.close(index) {
+                Some(tab) => tab,
+                None => return false,
+            },
         };
         self.unwatch_tab(&tab);
-        log::info!("moving a tab into a pane of another window");
+        log::info!("moving a tab or a pane into a pane of another window");
         cx.defer(move |cx| {
             let _ = handle.update(cx, |_, window, cx| {
                 target.update(cx, |view, cx| view.receive_tab(tab, drop, window, cx));
@@ -305,6 +366,22 @@ impl AppView {
         let _ = cx;
         let side = drop_side((x - rect.x) * w, (y - rect.y) * h, rect.w * w, rect.h * h);
         Some(TabDrop { terminal, side })
+    }
+
+    /// A pane dragged with Alt was dropped on the bar: it opens a tab of its own (J5). The drop
+    /// stops the mouse up there, so the drag ends here too.
+    pub(super) fn drop_pane_on_bar(
+        &mut self,
+        terminal: &Entity<TerminalView>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.join = JoinState {
+            panes_bounds: self.join.panes_bounds.clone(),
+            alt: self.join.alt,
+            ..JoinState::default()
+        };
+        self.move_pane_to_tab(terminal, window, cx);
     }
 
     /// Moves the pane of `terminal` to a tab of its own, the last one, active (J5).

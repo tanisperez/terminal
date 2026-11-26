@@ -43,6 +43,7 @@ fn app(key: &str) -> Vec<&str> {
 pub fn groups() -> Vec<ShortcutGroup> {
     let row = |key: &str, keys: &[&str]| Shortcut::new(t!(key), keys);
     let click = t!("shortcuts.key.click").to_string();
+    let drag = t!("shortcuts.key.drag").to_string();
     let arrows = "\u{2190}\u{2191}\u{2192}\u{2193}";
     let copy_keys: Vec<&str> = if cfg!(target_os = "macos") {
         vec!["Cmd", "C"]
@@ -75,6 +76,7 @@ pub fn groups() -> Vec<ShortcutGroup> {
                 row("shortcuts.action.split_duplicate", &[ALT, "Shift", "D"]),
                 row("shortcuts.action.pane_focus", &[ALT, arrows]),
                 row("shortcuts.action.pane_resize", &[ALT, "Shift", arrows]),
+                row("shortcuts.action.pane_move", &[ALT, &drag]),
             ],
         },
         ShortcutGroup {
