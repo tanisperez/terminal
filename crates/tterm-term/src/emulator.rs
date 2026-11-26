@@ -522,57 +522,122 @@ impl Emulator {
     /// right move at the end of the command would accept an autosuggestion (zsh, fish), whose
     /// gray text is drawn after the cursor like typed text.
     pub fn prompt_edit(&self) -> Option<PromptEdit> {
-        if self.alternate_screen() || !self.terminal.is_cursor_at_prompt().ok()? {
-            return None;
-        }
+        let cursor = self.prompt_cursor()?;
         let selection = self.terminal.selection().ok()??;
         if selection.is_rectangle() {
             return None;
         }
-        let active = |at: &ghostty_vt::screen::GridRef<'_>| {
-            self.terminal
-                .point_from_grid_ref(at, PointSpace::Active)
-                .ok()
-                .flatten()
-        };
-        let (a, b) = (active(&selection.start())?, active(&selection.end())?);
-        let cols = u32::from(self.size.cols);
-        let index = |p: PointCoordinate| p.y * cols + u32::from(p.x);
-        let (start, end) = if index(a) <= index(b) {
-            (index(a), index(b))
-        } else {
-            (index(b), index(a))
-        };
-        let cursor = u32::from(self.terminal.cursor_y().ok()?) * cols
-            + u32::from(self.terminal.cursor_x().ok()?);
-        if end >= cursor {
+        let (a, b) = (
+            self.active_index(&selection.start())?,
+            self.active_index(&selection.end())?,
+        );
+        let (start, end) = (a.min(b), a.max(b));
+        if end >= cursor || !self.one_line(start, cursor) {
             return None;
         }
-        // Rows between the selection and the cursor must be one line the shell wrapped.
-        for row in start / cols + 1..=cursor / cols {
-            let above = self
-                .terminal
-                .grid_ref(Point::Active(PointCoordinate { x: 0, y: row - 1 }))
-                .ok()?
-                .row()
-                .ok()?;
-            if !above.is_wrapped().ok()? {
-                return None;
-            }
+        let delete = self.command_chars(start, end + 1)?;
+        let left = self.command_chars(end + 1, cursor)?;
+        Some(PromptEdit { left, delete })
+    }
+
+    /// The arrow presses that take the cursor of the command being typed at the shell prompt to
+    /// a clicked visible cell, as a text field does (as Ghostty's click to move, with the
+    /// shell integration's `cl=line`): negative to the left, positive to the right, before the
+    /// cell or after it when `left` is false. A click past the end of the command goes to its
+    /// end. `None` outside the command, on another line, or where the prompt is not marked. A
+    /// click on an autosuggestion accepts it, as the right arrow does.
+    pub fn prompt_move(&self, col: u16, row: u16, left: bool) -> Option<isize> {
+        let cursor = self.prompt_cursor()?;
+        let at = self.terminal.grid_ref(viewport_point(col, row)).ok()?;
+        let mut target = self.active_index(&at)?;
+        let cell = at.cell().ok()?;
+        if !left && cell.codepoint().ok()? != 0 {
+            target += if cell.wide().ok()? == CellWide::Wide {
+                2
+            } else {
+                1
+            };
         }
-        // Each character of the command counts once: a wide one spans two cells.
-        let mut delete = 0;
-        let mut left = 0;
-        for at in start..cursor {
-            let cell = self
-                .terminal
-                .grid_ref(Point::Active(PointCoordinate {
-                    x: (at % cols) as u16,
-                    y: at / cols,
-                }))
-                .ok()?
-                .cell()
-                .ok()?;
+        if !self.one_line(target.min(cursor), target.max(cursor)) {
+            return None;
+        }
+        match target.cmp(&cursor) {
+            std::cmp::Ordering::Less => {
+                let chars = self.command_chars(target, cursor)?;
+                Some(-(chars as isize))
+            }
+            std::cmp::Ordering::Greater => {
+                // Up to the end of the command: the cells after it are empty.
+                let end = (cursor..target)
+                    .find(|&index| {
+                        self.cell_at_index(index)
+                            .and_then(|cell| cell.codepoint().ok())
+                            .is_none_or(|codepoint| codepoint == 0)
+                    })
+                    .unwrap_or(target);
+                let chars = self.command_chars(cursor, end)?;
+                (chars > 0).then_some(chars as isize)
+            }
+            std::cmp::Ordering::Equal => None,
+        }
+    }
+
+    /// The cursor as an index into the active area (`row * cols + col`), when it is in the
+    /// command being typed at a shell prompt marked by the shell integration (OSC 133), outside
+    /// full screen programs.
+    fn prompt_cursor(&self) -> Option<u32> {
+        if self.alternate_screen() || !self.terminal.is_cursor_at_prompt().ok()? {
+            return None;
+        }
+        let cols = u32::from(self.size.cols);
+        Some(
+            u32::from(self.terminal.cursor_y().ok()?) * cols
+                + u32::from(self.terminal.cursor_x().ok()?),
+        )
+    }
+
+    /// A cell as an index into the active area, `None` in the scrollback.
+    fn active_index(&self, at: &ghostty_vt::screen::GridRef<'_>) -> Option<u32> {
+        let point = self
+            .terminal
+            .point_from_grid_ref(at, PointSpace::Active)
+            .ok()
+            .flatten()?;
+        Some(point.y * u32::from(self.size.cols) + u32::from(point.x))
+    }
+
+    fn cell_at_index(&self, index: u32) -> Option<ghostty_vt::screen::Cell> {
+        let cols = u32::from(self.size.cols);
+        self.terminal
+            .grid_ref(Point::Active(PointCoordinate {
+                x: (index % cols) as u16,
+                y: index / cols,
+            }))
+            .ok()?
+            .cell()
+            .ok()
+    }
+
+    /// Whether the cells from `start` to `end` are on one line, the rows between them wrapped
+    /// by the shell and not ended with a newline.
+    fn one_line(&self, start: u32, end: u32) -> bool {
+        let cols = u32::from(self.size.cols);
+        (start / cols + 1..=end / cols).all(|row| {
+            self.terminal
+                .grid_ref(Point::Active(PointCoordinate { x: 0, y: row - 1 }))
+                .and_then(|at| at.row())
+                .and_then(|row| row.is_wrapped())
+                .unwrap_or(false)
+        })
+    }
+
+    /// The characters of the command in the cells from `start` up to `end` (excluded): a wide
+    /// one counts once. `None` if one of the cells is not typed text (the prompt, output,
+    /// empty).
+    fn command_chars(&self, start: u32, end: u32) -> Option<usize> {
+        let mut chars = 0;
+        for index in start..end {
+            let cell = self.cell_at_index(index)?;
             if matches!(
                 cell.wide().ok()?,
                 CellWide::SpacerTail | CellWide::SpacerHead
@@ -584,13 +649,9 @@ impl Emulator {
             {
                 return None;
             }
-            if at <= end {
-                delete += 1;
-            } else {
-                left += 1;
-            }
+            chars += 1;
         }
-        Some(PromptEdit { left, delete })
+        Some(chars)
     }
 
     /// The selected text, lines joined as the program wrote them and trailing spaces trimmed,
@@ -1252,6 +1313,28 @@ mod tests {
         term.feed(b"\x1b[?1049hecho hi");
         term.select_start(1, 0, true, SelectionUnit::Word).unwrap();
         assert_eq!(term.prompt_edit(), None);
+    }
+
+    #[test]
+    fn a_click_in_the_command_moves_the_cursor() {
+        let mut term = emulator(40, 3);
+        at_prompt(&mut term, "echo hello world");
+        // On the left half of the "h" of "hello" (column 7): before it, 11 characters back.
+        assert_eq!(term.prompt_move(7, 0, true), Some(-11));
+        // On its right half: after it.
+        assert_eq!(term.prompt_move(7, 0, false), Some(-10));
+        // On the cursor itself, nothing to do.
+        assert_eq!(term.prompt_move(18, 0, true), None);
+        // On the prompt or on another row, nothing either.
+        assert_eq!(term.prompt_move(0, 0, true), None);
+        assert_eq!(term.prompt_move(7, 1, true), None);
+        // Back at the start, a click past the end goes to the end.
+        term.feed(b"\x1b[11D");
+        assert_eq!(term.prompt_move(30, 0, true), Some(11));
+        // Without the shell integration's marks, nothing.
+        let mut term = emulator(40, 3);
+        term.feed(b"$ echo hello world");
+        assert_eq!(term.prompt_move(7, 0, true), None);
     }
 
     #[test]

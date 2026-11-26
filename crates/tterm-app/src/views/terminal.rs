@@ -136,6 +136,9 @@ pub struct TerminalView {
     grid_origin: Point<Pixels>,
     /// Whether the left button is down over the grid, extending the selection as it moves.
     selecting: bool,
+    /// The cell of a plain single click, which moves the cursor of the command there when the
+    /// button comes up without a drag.
+    click: Option<(u16, u16, bool)>,
     /// The button pressed while a program tracks the mouse, for its release and drags.
     mouse_pressed: Option<MouseButton>,
     /// Whether a clipboard image is saved and pasted as a path (`paste_images`).
@@ -285,6 +288,7 @@ impl TerminalView {
             _resize: Task::ready(()),
             grid_origin: Point::default(),
             selecting: false,
+            click: None,
             mouse_pressed: None,
             _output: Task::ready(()),
             _focus: Vec::new(),
@@ -618,11 +622,23 @@ impl TerminalView {
         }
     }
 
-    /// The keys that erase the selection when it lies in the command typed at the shell prompt,
-    /// as in a text field (`Emulator::prompt_edit`), and the selection cleared. Empty, with the
-    /// selection kept, anywhere else.
-    fn erase_selection_at_prompt(&mut self) -> Vec<u8> {
-        let Some(edit) = self.emulator.prompt_edit() else {
+    /// Typing clears the selection, as Ghostty's `selection-clear-on-typing`, so its highlight
+    /// does not stay on text that changes under it. When it lies in the command typed at the
+    /// shell prompt and the key `replaces` it (text, a paste, Backspace, Delete), the keys that
+    /// erase it come back, as in a text field (`Emulator::prompt_edit`); empty otherwise.
+    fn type_over_selection(&mut self, replaces: bool) -> Vec<u8> {
+        let edit = if replaces {
+            self.emulator.prompt_edit()
+        } else {
+            None
+        };
+        let Some(edit) = edit else {
+            if self.has_selection() {
+                if let Err(error) = self.emulator.clear_selection() {
+                    log::debug!("selection not cleared: {error}");
+                }
+                self.refresh_frame();
+            }
             return Vec::new();
         };
         let left = self
@@ -738,7 +754,7 @@ impl TerminalView {
             && !mods.shift
             && !mods.platform
         {
-            let erase = self.erase_selection_at_prompt();
+            let erase = self.type_over_selection(true);
             if !erase.is_empty() {
                 cx.stop_propagation();
                 self.send_input(&erase, cx);
@@ -754,6 +770,7 @@ impl TerminalView {
         let bytes = self.emulator.encode_key(&input);
         if !bytes.is_empty() {
             cx.stop_propagation();
+            self.type_over_selection(false);
             self.send_input(&bytes, cx);
         }
     }
@@ -826,7 +843,7 @@ impl TerminalView {
             return;
         };
         // Pasted over a selection in the command, the text takes its place.
-        let mut bytes = self.erase_selection_at_prompt();
+        let mut bytes = self.type_over_selection(true);
         bytes.extend(self.emulator.encode_paste(&text));
         self.send_input(&bytes, cx);
     }
@@ -978,7 +995,7 @@ impl TerminalView {
             return;
         }
         match event.button {
-            MouseButton::Left => self.on_mouse_up(cx),
+            MouseButton::Left => self.on_mouse_up(event.position, cx),
             // The middle button pastes the primary selection, as in X11 and Wayland terminals.
             #[cfg(target_os = "linux")]
             MouseButton::Middle => self.paste_primary(cx),
@@ -1037,6 +1054,8 @@ impl TerminalView {
             log::debug!("selection not started: {error}");
         }
         self.selecting = unit == SelectionUnit::Cell;
+        self.click =
+            (event.click_count <= 1 && !event.modifiers.modified()).then_some((col, row, left));
         self.refresh_frame();
         cx.notify();
     }
@@ -1123,8 +1142,22 @@ impl TerminalView {
         }
     }
 
-    fn on_mouse_up(&mut self, cx: &mut Context<Self>) {
+    fn on_mouse_up(&mut self, position: Point<Pixels>, cx: &mut Context<Self>) {
         self.selecting = false;
+        // A click that did not drag, in the command at the prompt, moves its cursor there.
+        if let Some((col, row, left)) = self.click.take()
+            && self
+                .cell_side_at(position)
+                .is_some_and(|(c, r, _)| (c, r) == (col, row))
+            && !self.has_selection()
+            && let Some(moves) = self.emulator.prompt_move(col, row, left)
+        {
+            let key = if moves < 0 { "left" } else { "right" };
+            let arrow = self
+                .emulator
+                .encode_key(&KeyInput::named(key, Modifiers::NONE));
+            self.send_input(&arrow.repeat(moves.unsigned_abs()), cx);
+        }
         // On Linux the selection is also the primary selection, pasted with the middle button.
         #[cfg(target_os = "linux")]
         if let Ok(Some(text)) = self.emulator.selection_text() {
@@ -1912,7 +1945,7 @@ impl EntityInputHandler for TerminalView {
         }
         if !text.is_empty() {
             // Typed over a selection in the command, the text takes its place.
-            let mut bytes = self.erase_selection_at_prompt();
+            let mut bytes = self.type_over_selection(true);
             bytes.extend(text.as_bytes());
             self.send_input(&bytes, cx);
         }

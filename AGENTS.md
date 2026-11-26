@@ -96,6 +96,13 @@ Expo/React Native conventions here.
 - Copy and paste (decided on 2026-11-23), as the author's kitty: Ctrl+C copies the selection
   and clears it, or else goes to the program; Ctrl+V pastes. Ctrl+Shift+C and Ctrl+Shift+V stay.
   Ctrl+click (Cmd+click) opens the URL under the mouse (`state/links.rs`).
+- The command at the prompt edits like a text field (#62, `Emulator::prompt_edit` and
+  `prompt_move`), where the shell integration marks it (OSC 133 input cells, `cl=line`): a click
+  moves the cursor there with arrow keys, and typing, pasting, Backspace or Delete over a
+  selection in it replaces the selection. The selection is erased with left moves and Backspace
+  only, so it must end before the cursor: a right move at the end of the command accepts a zsh
+  or fish autosuggestion, drawn like typed text. A click on a suggestion accepts it. Typing
+  clears any other selection, as Ghostty's `selection-clear-on-typing`.
 - Profiles (#5, decided on 2026-11-23) live in `settings.toml`: detected profiles are not
   written; the user's own ones are `[[profiles]]` tables (`name`, `shell`, `cwd`, `startup`,
   `color`, `shortcut`), plus `default_profile` and `hidden_profiles`. `startup` is typed into the
