@@ -7,8 +7,8 @@
 use std::sync::Arc;
 
 use ghostty_vt::render::{CellIterator, CursorVisualStyle, Dirty, RowIterator};
-use ghostty_vt::screen::CellWide;
 use ghostty_vt::screen::TrackedGridRef;
+use ghostty_vt::screen::{CellSemanticContent, CellWide};
 use ghostty_vt::selection::{FormatOptions, SelectLineOptions, SelectWordOptions, Selection};
 use ghostty_vt::style::{Palette, RgbColor, Underline};
 use ghostty_vt::terminal::{CursorStyle, Mode, Point, PointCoordinate, PointSpace, ScrollViewport};
@@ -128,6 +128,14 @@ pub struct Emulator {
     anchor_left: bool,
     /// How selected cells look.
     selection: SelectionStyle,
+}
+
+/// The keys that erase a selection in the command at the shell prompt
+/// ([`Emulator::prompt_edit`]): `left` presses of the left arrow, then `delete` of Backspace.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PromptEdit {
+    pub left: usize,
+    pub delete: usize,
 }
 
 /// How a selection grows from where the mouse was pressed.
@@ -504,6 +512,85 @@ impl Emulator {
         self.anchor = None;
         self.terminal.set_selection(None)?;
         Ok(())
+    }
+
+    /// How to replace the selection when it lies in the command being typed at the shell
+    /// prompt, as a text field does: the cursor moves left to the end of the selection and
+    /// erases it with Backspace. `None` when that is not safe: no selection, no prompt marks
+    /// (OSC 133), a full screen program, a selection outside the command (the prompt, output,
+    /// another line) or one that does not end before the cursor. Only left moves are used: a
+    /// right move at the end of the command would accept an autosuggestion (zsh, fish), whose
+    /// gray text is drawn after the cursor like typed text.
+    pub fn prompt_edit(&self) -> Option<PromptEdit> {
+        if self.alternate_screen() || !self.terminal.is_cursor_at_prompt().ok()? {
+            return None;
+        }
+        let selection = self.terminal.selection().ok()??;
+        if selection.is_rectangle() {
+            return None;
+        }
+        let active = |at: &ghostty_vt::screen::GridRef<'_>| {
+            self.terminal
+                .point_from_grid_ref(at, PointSpace::Active)
+                .ok()
+                .flatten()
+        };
+        let (a, b) = (active(&selection.start())?, active(&selection.end())?);
+        let cols = u32::from(self.size.cols);
+        let index = |p: PointCoordinate| p.y * cols + u32::from(p.x);
+        let (start, end) = if index(a) <= index(b) {
+            (index(a), index(b))
+        } else {
+            (index(b), index(a))
+        };
+        let cursor = u32::from(self.terminal.cursor_y().ok()?) * cols
+            + u32::from(self.terminal.cursor_x().ok()?);
+        if end >= cursor {
+            return None;
+        }
+        // Rows between the selection and the cursor must be one line the shell wrapped.
+        for row in start / cols + 1..=cursor / cols {
+            let above = self
+                .terminal
+                .grid_ref(Point::Active(PointCoordinate { x: 0, y: row - 1 }))
+                .ok()?
+                .row()
+                .ok()?;
+            if !above.is_wrapped().ok()? {
+                return None;
+            }
+        }
+        // Each character of the command counts once: a wide one spans two cells.
+        let mut delete = 0;
+        let mut left = 0;
+        for at in start..cursor {
+            let cell = self
+                .terminal
+                .grid_ref(Point::Active(PointCoordinate {
+                    x: (at % cols) as u16,
+                    y: at / cols,
+                }))
+                .ok()?
+                .cell()
+                .ok()?;
+            if matches!(
+                cell.wide().ok()?,
+                CellWide::SpacerTail | CellWide::SpacerHead
+            ) {
+                continue;
+            }
+            if cell.semantic_content().ok()? != CellSemanticContent::Input
+                || cell.codepoint().ok()? == 0
+            {
+                return None;
+            }
+            if at <= end {
+                delete += 1;
+            } else {
+                left += 1;
+            }
+        }
+        Some(PromptEdit { left, delete })
     }
 
     /// The selected text, lines joined as the program wrote them and trailing spaces trimmed,
@@ -1109,6 +1196,82 @@ mod tests {
         // A program on the Kitty protocol gets the key with its modifiers.
         term.feed(b"\x1b[>1u");
         assert_eq!(term.encode_key(&ctrl_backspace), b"\x1b[127;5u");
+    }
+
+    /// A prompt as the shell integration marks it (OSC 133 A, then B where the command starts),
+    /// followed by what the user typed.
+    fn at_prompt(term: &mut Emulator, typed: &str) {
+        term.feed(b"\x1b]133;A\x07$ \x1b]133;B\x07");
+        term.feed(typed.as_bytes());
+    }
+
+    #[test]
+    fn a_selection_in_the_command_is_erased_from_its_end() {
+        let mut term = emulator(40, 3);
+        at_prompt(&mut term, "echo hello world");
+        // Double click on "hello", which starts at column 7.
+        term.select_start(8, 0, true, SelectionUnit::Word).unwrap();
+        assert_eq!(term.prompt_edit(), Some(PromptEdit { left: 6, delete: 5 }));
+        // Right before the cursor: nothing to move over.
+        term.select_start(13, 0, true, SelectionUnit::Word).unwrap();
+        assert_eq!(term.prompt_edit(), Some(PromptEdit { left: 0, delete: 5 }));
+    }
+
+    #[test]
+    fn a_selection_after_the_cursor_is_left_alone() {
+        let mut term = emulator(40, 3);
+        at_prompt(&mut term, "echo hello world");
+        // The shell moved the cursor back to "world": right moves could accept a suggestion.
+        term.feed(b"\x1b[5D");
+        term.select_start(13, 0, true, SelectionUnit::Word).unwrap();
+        assert_eq!(term.prompt_edit(), None);
+    }
+
+    #[test]
+    fn only_the_command_is_edited() {
+        let mut term = emulator(40, 3);
+        at_prompt(&mut term, "echo hi");
+        // The prompt itself.
+        term.select_start(0, 0, true, SelectionUnit::Cell).unwrap();
+        term.select_to(3, 0, false).unwrap();
+        assert_eq!(term.prompt_edit(), None);
+        // The output of the last command, on the line above.
+        let mut term = emulator(40, 3);
+        term.feed(b"output\r\n");
+        at_prompt(&mut term, "echo hi");
+        term.select_start(2, 0, true, SelectionUnit::Word).unwrap();
+        assert_eq!(term.prompt_edit(), None);
+        // Without the shell integration's marks.
+        let mut term = emulator(40, 3);
+        term.feed(b"$ echo hi");
+        term.select_start(3, 0, true, SelectionUnit::Word).unwrap();
+        assert_eq!(term.prompt_edit(), None);
+        // In a full screen program.
+        let mut term = emulator(40, 3);
+        at_prompt(&mut term, "echo hi");
+        term.feed(b"\x1b[?1049hecho hi");
+        term.select_start(1, 0, true, SelectionUnit::Word).unwrap();
+        assert_eq!(term.prompt_edit(), None);
+    }
+
+    #[test]
+    fn a_wide_character_counts_once() {
+        let mut term = emulator(40, 3);
+        at_prompt(&mut term, "echo \u{65e5}\u{672c} x");
+        // The two wide characters take columns 7 to 10.
+        term.select_start(7, 0, true, SelectionUnit::Cell).unwrap();
+        term.select_to(10, 0, false).unwrap();
+        assert_eq!(term.prompt_edit(), Some(PromptEdit { left: 2, delete: 2 }));
+    }
+
+    #[test]
+    fn a_command_the_shell_wrapped_is_one_line() {
+        let mut term = emulator(10, 3);
+        // "$ " and 12 characters: "echo abcdef" ends on the second row.
+        at_prompt(&mut term, "echo abcdef gh");
+        term.select_start(8, 0, true, SelectionUnit::Cell).unwrap();
+        term.select_to(9, 0, false).unwrap();
+        assert_eq!(term.prompt_edit(), Some(PromptEdit { left: 6, delete: 2 }));
     }
 
     #[test]

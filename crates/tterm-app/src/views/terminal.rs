@@ -618,6 +618,27 @@ impl TerminalView {
         }
     }
 
+    /// The keys that erase the selection when it lies in the command typed at the shell prompt,
+    /// as in a text field (`Emulator::prompt_edit`), and the selection cleared. Empty, with the
+    /// selection kept, anywhere else.
+    fn erase_selection_at_prompt(&mut self) -> Vec<u8> {
+        let Some(edit) = self.emulator.prompt_edit() else {
+            return Vec::new();
+        };
+        let left = self
+            .emulator
+            .encode_key(&KeyInput::named("left", Modifiers::NONE));
+        let backspace = self
+            .emulator
+            .encode_key(&KeyInput::named("backspace", Modifiers::NONE));
+        let mut bytes = left.repeat(edit.left);
+        bytes.extend(backspace.repeat(edit.delete));
+        if let Err(error) = self.emulator.clear_selection() {
+            log::debug!("selection not cleared: {error}");
+        }
+        bytes
+    }
+
     /// Sends typed input to the shell and shows the live screen.
     fn send_input(&mut self, bytes: &[u8], cx: &mut Context<Self>) {
         if bytes.is_empty() {
@@ -710,6 +731,20 @@ impl TerminalView {
         if cfg!(target_os = "macos") && keystroke.modifiers.platform {
             return;
         }
+        // Backspace or Delete on a selection in the command erases it, and nothing else.
+        if matches!(keystroke.key.as_str(), "backspace" | "delete")
+            && !mods.control
+            && !mods.alt
+            && !mods.shift
+            && !mods.platform
+        {
+            let erase = self.erase_selection_at_prompt();
+            if !erase.is_empty() {
+                cx.stop_propagation();
+                self.send_input(&erase, cx);
+                return;
+            }
+        }
         let input = KeyInput {
             key: keystroke.key.clone(),
             text: keystroke.key_char.clone(),
@@ -790,7 +825,9 @@ impl TerminalView {
         let Some(text) = item.text() else {
             return;
         };
-        let bytes = self.emulator.encode_paste(&text);
+        // Pasted over a selection in the command, the text takes its place.
+        let mut bytes = self.erase_selection_at_prompt();
+        bytes.extend(self.emulator.encode_paste(&text));
         self.send_input(&bytes, cx);
     }
 
@@ -1874,7 +1911,10 @@ impl EntityInputHandler for TerminalView {
             cx.notify();
         }
         if !text.is_empty() {
-            self.send_input(text.as_bytes(), cx);
+            // Typed over a selection in the command, the text takes its place.
+            let mut bytes = self.erase_selection_at_prompt();
+            bytes.extend(text.as_bytes());
+            self.send_input(&bytes, cx);
         }
     }
 
